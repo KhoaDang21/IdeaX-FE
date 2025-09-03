@@ -45,8 +45,8 @@ const Home: FC = () => {
                         The premier platform where groundbreaking startups meet visionary investors. Secure funding, build partnerships, and transform ideas into reality through our intelligent matching system.
                     </p>
                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                        <Link to="/startups" style={{ padding: '12px 18px', borderRadius: 10, background: '#34419A', color: '#fff', textDecoration: 'none', boxShadow: '0 8px 24px rgba(59,130,246,0.3)' }}>Join as Startup</Link>
-                        <Link to="/investors" style={{ padding: '12px 18px', borderRadius: 10, background: '#fff', border: '1px solid #dbe7ff', color: '#0f172a', textDecoration: 'none' }}>Join as Investor</Link>
+                        <Link to="/start" style={{ padding: '12px 18px', borderRadius: 10, background: '#34419A', color: '#fff', textDecoration: 'none', boxShadow: '0 8px 24px rgba(59,130,246,0.3)' }}>Join as Startup</Link>
+                        <Link to="/start/investor" style={{ padding: '12px 18px', borderRadius: 10, background: '#fff', border: '1px solid #dbe7ff', color: '#0f172a', textDecoration: 'none' }}>Join as Investor</Link>
                     </div>
                 </div>
             </section>
@@ -82,7 +82,7 @@ const Home: FC = () => {
                     <p style={{ margin: '0 auto 16px', maxWidth: 760, textAlign: 'center' }}>Join thousands of successful startups and investors who have already found their perfect match on our platform.</p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
                         <Link to="/start" style={{ padding: '10px 16px', borderRadius: 10, background: '#fff', color: '#0f172a', textDecoration: 'none' }}>Start Your Journey</Link>
-                        <Link to="/signin" style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.7)', color: '#fff', textDecoration: 'none' }}>Sign In</Link>
+                        <Link to="/login" style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.7)', color: '#fff', textDecoration: 'none' }}>Sign In</Link>
                     </div>
                 </div>
             </section>
