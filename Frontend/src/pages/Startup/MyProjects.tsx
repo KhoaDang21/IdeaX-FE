@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom"; // Thêm useNavigate từ react-router-dom
 import {
   CheckCircleFilled,
   ClockCircleOutlined,
@@ -9,6 +10,7 @@ import {
 } from "@ant-design/icons";
 
 const MyProjects: React.FC = () => {
+  const navigate = useNavigate(); // Hook để điều hướng
   const [milestones, setMilestones] = useState([
     { label: "Financial documents submitted", due: "2024-02-10", checked: true },
     { label: "Legal review completed", due: "2024-02-12", checked: true },
@@ -23,8 +25,62 @@ const MyProjects: React.FC = () => {
     setMilestones(updatedMilestones);
   };
 
+  // Hàm xử lý khi nhấn "New Project"
+  const handleNewProject = () => {
+    navigate("/startup/new-project"); // Điều hướng đến route "startup/new-project"
+  };
+
   return (
     <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
+      <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "12px 16px",
+    borderRadius: 6,
+  }}
+>
+  <div>
+    <h3
+      style={{
+        margin: 0,
+        color: "#1e3a8a",
+        fontSize: 16,
+        fontWeight: 600,
+      }}
+    >
+      Project Status
+    </h3>
+    <p
+      style={{
+        margin: 0,
+        fontSize: 13,
+        color: "#6b7280",
+      }}
+    >
+      Track your project progress and manage milestones
+    </p>
+  </div>
+
+  {/* Bên phải: nút */}
+  <button
+    onClick={handleNewProject}
+    style={{
+      padding: "6px 16px",
+      background: "#38bdf8",
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 500,
+    }}
+  >
+    New Project
+  </button>
+</div>
+
       {/* Top - Project Cards */}
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         {/* Card 1 */}

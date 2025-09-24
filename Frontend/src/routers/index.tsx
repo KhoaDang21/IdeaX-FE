@@ -9,6 +9,7 @@ import MyProjects from '../pages/Startup/MyProjects'
 import Roommeet from '../pages/Startup/Roommeet'
 import Profile from '../pages/Startup/Profile'
 import Payment from '../pages/Startup/Payment'
+import SubmitNewProject from '../pages/Startup/NewProject'
 import StartupLayout from '../components/StartupLayout'
 import FindProjects from '../pages/Investor/FindProjects'
 import ProgressTracking from '../pages/Investor/ProgressTracking'
@@ -44,6 +45,7 @@ export default function AppRoutes() {
                 <Route path="roommeet" element={<Roommeet />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="payment" element={<Payment />} />
+                <Route path="new-project" element={<SubmitNewProject />} />
             </Route>
             <Route path="/investor" element={<InvestorLayout />}>
                 <Route path="find-projects" element={<FindProjects />} />
