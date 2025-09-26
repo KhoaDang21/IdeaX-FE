@@ -1,12 +1,16 @@
 import type { FC } from 'react'
+import { App } from 'antd'
 import { Link, useNavigate } from 'react-router-dom'
 import { ThunderboltOutlined, DollarOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { TypedUseSelectorHook } from 'react-redux'
+import { registerStartup } from '../services/features/auth/authSlice'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
-type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void }
+type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; error?: string }
 
-const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick }) => {
+const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange, error }) => {
     return (
         <div style={{ marginBottom: 14 }}>
             <label style={{ display: 'block', color: '#34419A', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{label}</label>
@@ -14,7 +18,9 @@ const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, o
                 <input
                     type={type}
                     placeholder={placeholder}
-                    style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: '1px solid #34419A', borderRadius: 10, outline: 'none', color: '#34419A' }}
+                    value={value}
+                    onChange={onChange}
+                    style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: `1px solid ${error ? '#ef4444' : '#34419A'}`, borderRadius: 10, outline: 'none', color: '#34419A' }}
                 />
                 {rightIcon && (
                     <button type="button" onClick={onRightIconClick} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 0, cursor: 'pointer', color: '#64748b' }}>
@@ -22,6 +28,7 @@ const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, o
                     </button>
                 )}
             </div>
+            {error && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 6 }}>{error}</div>}
         </div>
     )
 }
@@ -34,9 +41,81 @@ const Bullet: FC<{ children: React.ReactNode }> = ({ children }) => (
 )
 
 const StartupsJoin: FC = () => {
+    const { message } = App.useApp();
     const [showPwd, setShowPwd] = useState(false)
     const [showPwd2, setShowPwd2] = useState(false)
-    const navigate = useNavigate()
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [fullName, setFullName] = useState('')
+    const [startupName, setStartupName] = useState('')
+    const [companyWebsite, setCompanyWebsite] = useState('')
+    const [aboutUs, setAboutUs] = useState('')
+    // Define RootState and AppDispatch types for type safety
+    // Try to import RootState and AppDispatch from the store if available
+    // Fallback to basic types if not available
+    type RootState = { auth: { loading: boolean } };
+    const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+    const dispatch = useDispatch();
+    const loading = useTypedSelector(state => state.auth.loading);
+    const navigate = useNavigate();
+    const [submitting, setSubmitting] = useState(false)
+    const [errors, setErrors] = useState<Record<string, string>>({})
+
+    const validateEmail = (email: string) => {
+        // Simple email regex
+        return /^\S+@\S+\.\S+$/.test(email);
+    };
+
+    const validateUrl = (url: string) => {
+        try {
+            // Allow empty (optional field). Validate only when provided
+            if (!url.trim()) return true;
+            const u = new URL(url);
+            return !!u.protocol && !!u.host;
+        } catch (_) {
+            return false;
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        let newErrors: Record<string, string> = {};
+        if (!fullName.trim()) newErrors.fullName = 'Vui lòng nhập họ tên';
+        if (!startupName.trim()) newErrors.startupName = 'Vui lòng nhập tên công ty';
+        if (!email.trim()) newErrors.email = 'Vui lòng nhập email';
+        else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
+        if (companyWebsite && !validateUrl(companyWebsite)) newErrors.companyWebsite = 'Website không hợp lệ';
+        if (!password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu';
+        else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
+        if (!confirmPassword.trim()) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
+        else if (password !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+        setErrors(newErrors);
+        if (Object.keys(newErrors).length > 0) {
+            message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
+            return;
+        }
+        setSubmitting(true);
+        message.loading({ content: 'Đang tạo tài khoản...', key: 'register', duration: 0 });
+        try {
+            await (dispatch as any)(registerStartup({
+                email,
+                password,
+                confirmPassword,
+                fullName,
+                startupName,
+                companyWebsite,
+                aboutUs
+            })).unwrap();
+            message.success({ content: 'Tạo tài khoản thành công! Vui lòng đăng nhập.', key: 'register' });
+            setTimeout(() => navigate('/login'), 1200);
+        } catch (err) {
+            message.error({ content: 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     return (
         <main>
             <header style={{ background: '#fff', borderBottom: '1px solid #eef2f7' }}>
@@ -77,11 +156,11 @@ const StartupsJoin: FC = () => {
                                 <Bullet>Access mentorship and resources</Bullet>
                             </ul>
 
-                            <form style={{ marginTop: 8 }}>
-                                <Input label="Full Name *" placeholder="Enter your full name" />
-                                <Input label="Company Name *" placeholder="Enter your company name" />
-                                <Input label="Email Address *" type="email" placeholder="Enter your email address" />
-                                <Input label="Website" placeholder="https://yourcompany.com" />
+                            <form style={{ marginTop: 8 }} onSubmit={handleSubmit}>
+                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} error={errors.fullName} />
+                                <Input label="Company Name *" placeholder="Enter your company name" value={startupName} onChange={(e) => setStartupName(e.target.value)} error={errors.startupName} />
+                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
+                                <Input label="Website" placeholder="https://yourcompany.com" value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} error={errors.companyWebsite} />
                                 <div style={{ marginBottom: 14 }}>
                                     <label
                                         style={{
@@ -107,12 +186,14 @@ const StartupsJoin: FC = () => {
                                             fontFamily: 'inherit',
                                         }}
                                         placeholder="Description"
+                                        value={aboutUs}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAboutUs(e.target.value)}
                                     />
                                 </div>
-                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} />
-                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} />
+                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
+                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} error={errors.confirmPassword} />
 
-                                <button type="button" style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>Create Startup Account</button>
+                                <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang tạo...' : 'Create Startup Account'}</button>
                             </form>
                         </div>
 
