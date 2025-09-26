@@ -8,16 +8,17 @@ import type { TypedUseSelectorHook } from 'react-redux';
 import { registerInvestor } from '../services/features/auth/authSlice';
 import { message } from 'antd';
 
-type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void };
-const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange }) => (
+type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void; error?: string };
+const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange, error }) => (
     <div style={{ marginBottom: 14 }}>
         <label style={{ display: 'block', color: '#34419A', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{label}</label>
         <div style={{ position: 'relative' }}>
-            <input type={type} placeholder={placeholder} value={value} onChange={onChange} style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: '1px solid #34419A', borderRadius: 10, outline: 'none', color: '#34419A' }} />
+            <input type={type} placeholder={placeholder} value={value} onChange={onChange} style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: `1px solid ${error ? '#ef4444' : '#34419A'}`, borderRadius: 10, outline: 'none', color: '#34419A' }} />
             {rightIcon && (
                 <button type="button" onClick={onRightIconClick} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 0, cursor: 'pointer', color: '#64748b' }}>{rightIcon}</button>
             )}
         </div>
+        {error && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 6 }}>{error}</div>}
     </div>
 );
 
@@ -71,6 +72,7 @@ const InvestorsJoin: FC = () => {
     const loading = useTypedSelector(state => state.auth.loading);
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const validateEmail = (email: string) => {
         return /^\S+@\S+\.\S+$/.test(email);
@@ -78,32 +80,40 @@ const InvestorsJoin: FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setErrors({});
         if (!fullName.trim()) {
             message.error('Vui lòng nhập họ tên.');
+            setErrors(prev => ({ ...prev, fullName: 'Vui lòng nhập họ tên' }));
             return;
         }
         if (!email.trim()) {
             message.error('Vui lòng nhập email.');
+            setErrors(prev => ({ ...prev, email: 'Vui lòng nhập email' }));
             return;
         }
         if (!validateEmail(email)) {
             message.error('Email không hợp lệ.');
+            setErrors(prev => ({ ...prev, email: 'Email không hợp lệ' }));
             return;
         }
         if (!password.trim()) {
             message.error('Vui lòng nhập mật khẩu.');
+            setErrors(prev => ({ ...prev, password: 'Vui lòng nhập mật khẩu' }));
             return;
         }
          if (password.length < 6) {
             message.error('Mật khẩu phải có ít nhất 6 ký tự.');
+            setErrors(prev => ({ ...prev, password: 'Mật khẩu tối thiểu 6 ký tự' }));
             return;
         }
         if (!confirmPassword.trim()) {
             message.error('Vui lòng nhập xác nhận mật khẩu.');
+            setErrors(prev => ({ ...prev, confirmPassword: 'Vui lòng nhập xác nhận mật khẩu' }));
             return;
         }
         if (password !== confirmPassword) {
             message.error('Mật khẩu xác nhận không khớp.');
+            setErrors(prev => ({ ...prev, confirmPassword: 'Mật khẩu xác nhận không khớp' }));
             return;
         }
         setSubmitting(true);
@@ -190,9 +200,9 @@ const InvestorsJoin: FC = () => {
                             </ul>
 
                             <form style={{ marginTop: 8 }} onSubmit={handleSubmit}>
-                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={e => setFullName(e.target.value)} />
+                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={e => setFullName(e.target.value)} error={errors.fullName} />
                                 <Input label="Investment Firm/Organization" placeholder="Enter your firm or organization name" value={organization} onChange={e => setOrganization(e.target.value)} />
-                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={e => setEmail(e.target.value)} />
+                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={e => setEmail(e.target.value)} error={errors.email} />
                                 <Select label="Investment Focus" placeholder="Select investment focus" options={[
                                     'Technology & Software',
                                     'Healthcare & Biotech',
@@ -219,8 +229,8 @@ const InvestorsJoin: FC = () => {
                                     '$10M+'
                                 ]} value={investmentRange} onChange={e => setInvestmentRange(e.target.value)} />
                                 <Input label="Investment Experience" placeholder="Enter your investment experience" value={investmentExperience} onChange={e => setInvestmentExperience(e.target.value)} />
-                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={e => setPassword(e.target.value)} />
-                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={e => setPassword(e.target.value)} error={errors.password} />
+                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} error={errors.confirmPassword} />
                                 <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang tạo...' : 'Create Investor Account'}</button>
                             </form>
                         </div>

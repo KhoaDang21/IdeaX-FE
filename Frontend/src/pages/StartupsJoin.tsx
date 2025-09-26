@@ -8,9 +8,9 @@ import type { TypedUseSelectorHook } from 'react-redux'
 import { registerStartup } from '../services/features/auth/authSlice'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
-type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void }
+type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; error?: string }
 
-const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange }) => {
+const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange, error }) => {
     return (
         <div style={{ marginBottom: 14 }}>
             <label style={{ display: 'block', color: '#34419A', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{label}</label>
@@ -20,7 +20,7 @@ const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, o
                     placeholder={placeholder}
                     value={value}
                     onChange={onChange}
-                    style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: '1px solid #34419A', borderRadius: 10, outline: 'none', color: '#34419A' }}
+                    style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: `1px solid ${error ? '#ef4444' : '#34419A'}`, borderRadius: 10, outline: 'none', color: '#34419A' }}
                 />
                 {rightIcon && (
                     <button type="button" onClick={onRightIconClick} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 0, cursor: 'pointer', color: '#64748b' }}>
@@ -28,6 +28,7 @@ const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, o
                     </button>
                 )}
             </div>
+            {error && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 6 }}>{error}</div>}
         </div>
     )
 }
@@ -58,6 +59,7 @@ const StartupsJoin: FC = () => {
     const loading = useTypedSelector(state => state.auth.loading);
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false)
+    const [errors, setErrors] = useState<Record<string, string>>({})
 
     const validateEmail = (email: string) => {
         // Simple email regex
@@ -77,40 +79,50 @@ const StartupsJoin: FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setErrors({});
         if (!fullName.trim()) {
             message.error('Vui lòng nhập họ tên.');
+            setErrors(prev => ({ ...prev, fullName: 'Vui lòng nhập họ tên' }));
             return;
         }
         if (!startupName.trim()) {
             message.error('Vui lòng nhập tên công ty.');
+            setErrors(prev => ({ ...prev, startupName: 'Vui lòng nhập tên công ty' }));
             return;
         }
         if (!email.trim()) {
             message.error('Vui lòng nhập email.');
+            setErrors(prev => ({ ...prev, email: 'Vui lòng nhập email' }));
             return;
         }
         if (!validateEmail(email)) {
             message.error('Email không hợp lệ.');
+            setErrors(prev => ({ ...prev, email: 'Email không hợp lệ' }));
             return;
         }
         if (!validateUrl(companyWebsite)) {
             message.error('Website không hợp lệ. Vui lòng nhập URL hợp lệ (ví dụ: https://yourcompany.com).');
+            setErrors(prev => ({ ...prev, companyWebsite: 'Website không hợp lệ' }));
             return;
         }
         if (!password.trim()) {
             message.error('Vui lòng nhập mật khẩu.');
+            setErrors(prev => ({ ...prev, password: 'Vui lòng nhập mật khẩu' }));
             return;
         }
         if (password.length < 6) {
             message.error('Mật khẩu phải có ít nhất 6 ký tự.');
+            setErrors(prev => ({ ...prev, password: 'Mật khẩu tối thiểu 6 ký tự' }));
             return;
         }
         if (!confirmPassword.trim()) {
             message.error('Vui lòng nhập xác nhận mật khẩu.');
+            setErrors(prev => ({ ...prev, confirmPassword: 'Vui lòng nhập xác nhận mật khẩu' }));
             return;
         }
         if (password !== confirmPassword) {
             message.error('Mật khẩu xác nhận không khớp.');
+            setErrors(prev => ({ ...prev, confirmPassword: 'Mật khẩu xác nhận không khớp' }));
             return;
         }
         setSubmitting(true);
@@ -175,10 +187,10 @@ const StartupsJoin: FC = () => {
                             </ul>
 
                             <form style={{ marginTop: 8 }} onSubmit={handleSubmit}>
-                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                                <Input label="Company Name *" placeholder="Enter your company name" value={startupName} onChange={(e) => setStartupName(e.target.value)} />
-                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} />
-                                <Input label="Website" placeholder="https://yourcompany.com" value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} />
+                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} error={errors.fullName} />
+                                <Input label="Company Name *" placeholder="Enter your company name" value={startupName} onChange={(e) => setStartupName(e.target.value)} error={errors.startupName} />
+                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
+                                <Input label="Website" placeholder="https://yourcompany.com" value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} error={errors.companyWebsite} />
                                 <div style={{ marginBottom: 14 }}>
                                     <label
                                         style={{
@@ -208,8 +220,8 @@ const StartupsJoin: FC = () => {
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAboutUs(e.target.value)}
                                     />
                                 </div>
-                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={(e) => setPassword(e.target.value)} />
-                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
+                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} error={errors.confirmPassword} />
 
                                 <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang tạo...' : 'Create Startup Account'}</button>
                             </form>

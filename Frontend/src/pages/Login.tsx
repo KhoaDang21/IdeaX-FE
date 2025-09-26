@@ -8,7 +8,7 @@ import type { TypedUseSelectorHook } from 'react-redux';
 import { loginUser } from '../services/features/auth/authSlice';
 import { message } from 'antd';
 
-const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; color?: string; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void }> = ({ label, type = 'text', placeholder, rightIcon, onRightIconClick, color = '#34419A', value, onChange }) => {
+const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; color?: string; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void; error?: string }> = ({ label, type = 'text', placeholder, rightIcon, onRightIconClick, color = '#34419A', value, onChange, error }) => {
     return (
         <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', color, fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{label}</label>
@@ -22,7 +22,7 @@ const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?
                         width: '100%',
                         padding: '12px 14px',
                         paddingRight: rightIcon ? 38 : 14,
-                        border: `1px solid ${color}`,
+                        border: `1px solid ${error ? '#ef4444' : color}`,
                         borderRadius: 10,
                         outline: 'none',
                         color
@@ -34,6 +34,7 @@ const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?
                     </button>
                 )}
             </div>
+            {error && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 6 }}>{error}</div>}
         </div>
     )
 }
@@ -49,6 +50,7 @@ const Login: FC = () => {
     const user = useTypedSelector(state => state.auth.user);
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const validateEmail = (email: string) => {
         return /^\S+@\S+\.\S+$/.test(email);
@@ -56,20 +58,25 @@ const Login: FC = () => {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
+        setErrors({});
         if (!email.trim()) {
             message.error('Vui lòng nhập email.');
+            setErrors(prev => ({ ...prev, email: 'Vui lòng nhập email' }));
             return;
         }
         if (!validateEmail(email)) {
             message.error('Email không hợp lệ.');
+            setErrors(prev => ({ ...prev, email: 'Email không hợp lệ' }));
             return;
         }
         if (!password.trim()) {
             message.error('Vui lòng nhập mật khẩu.');
+            setErrors(prev => ({ ...prev, password: 'Vui lòng nhập mật khẩu' }));
             return;
         }
         if (password.length < 6) {
             message.error('Mật khẩu phải có ít nhất 6 ký tự.');
+            setErrors(prev => ({ ...prev, password: 'Mật khẩu tối thiểu 6 ký tự' }));
             return;
         }
         setSubmitting(true);
@@ -105,8 +112,8 @@ const Login: FC = () => {
                         <p style={{ textAlign: 'center', margin: '0 0 24px', color: '#64748b' }}>Sign in to your account</p>
 
                         <form onSubmit={handleSubmit}>
-                            <Input label="Email Address" type="email" placeholder="Enter your email address" color="#34419A" value={email} onChange={e => setEmail(e.target.value)} />
-                            <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" rightIcon={showPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPassword((v) => !v)} color="#34419A" value={password} onChange={e => setPassword(e.target.value)} />
+                            <Input label="Email Address" type="email" placeholder="Enter your email address" color="#34419A" value={email} onChange={e => setEmail(e.target.value)} error={(errors as any).email} />
+                            <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" rightIcon={showPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPassword((v) => !v)} color="#34419A" value={password} onChange={e => setPassword(e.target.value)} error={(errors as any).password} />
                             
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 14 }}>
