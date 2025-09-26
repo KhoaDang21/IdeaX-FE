@@ -1,12 +1,15 @@
 import type { FC } from 'react'
+import { message } from 'antd'
 import { Link, useNavigate } from 'react-router-dom'
 import { ThunderboltOutlined, DollarOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { registerStartup } from '../services/features/auth/authSlice'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
-type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void }
+type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void }
 
-const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick }) => {
+const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange }) => {
     return (
         <div style={{ marginBottom: 14 }}>
             <label style={{ display: 'block', color: '#34419A', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{label}</label>
@@ -14,6 +17,8 @@ const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, o
                 <input
                     type={type}
                     placeholder={placeholder}
+                    value={value}
+                    onChange={onChange}
                     style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: '1px solid #34419A', borderRadius: 10, outline: 'none', color: '#34419A' }}
                 />
                 {rightIcon && (
@@ -36,7 +41,56 @@ const Bullet: FC<{ children: React.ReactNode }> = ({ children }) => (
 const StartupsJoin: FC = () => {
     const [showPwd, setShowPwd] = useState(false)
     const [showPwd2, setShowPwd2] = useState(false)
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [fullName, setFullName] = useState('')
+    const [startupName, setStartupName] = useState('')
+    const [companyWebsite, setCompanyWebsite] = useState('')
+    const [aboutUs, setAboutUs] = useState('')
+    const dispatch = useDispatch()
+    const loading = useSelector((state: any) => state.auth.loading)
     const navigate = useNavigate()
+
+    const validateEmail = (email: string) => {
+        // Simple email regex
+        return /^\S+@\S+\.\S+$/.test(email);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!fullName.trim() || !startupName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+            message.error('Vui lòng nhập đầy đủ các trường bắt buộc.');
+            return;
+        }
+        if (!validateEmail(email)) {
+            message.error('Email không hợp lệ.');
+            return;
+        }
+        if (password.length < 6) {
+            message.error('Mật khẩu phải có ít nhất 6 ký tự.');
+            return;
+        }
+        if (password !== confirmPassword) {
+            message.error('Mật khẩu xác nhận không khớp.');
+            return;
+        }
+        try {
+            await (dispatch as any)(registerStartup({
+                email,
+                password,
+                confirmPassword,
+                fullName,
+                startupName,
+                companyWebsite,
+                aboutUs
+            })).unwrap();
+            navigate('/login');
+        } catch (err) {
+            // error toast is handled in slice; keep here for safety
+        }
+    };
+
     return (
         <main>
             <header style={{ background: '#fff', borderBottom: '1px solid #eef2f7' }}>
@@ -77,11 +131,11 @@ const StartupsJoin: FC = () => {
                                 <Bullet>Access mentorship and resources</Bullet>
                             </ul>
 
-                            <form style={{ marginTop: 8 }}>
-                                <Input label="Full Name *" placeholder="Enter your full name" />
-                                <Input label="Company Name *" placeholder="Enter your company name" />
-                                <Input label="Email Address *" type="email" placeholder="Enter your email address" />
-                                <Input label="Website" placeholder="https://yourcompany.com" />
+                            <form style={{ marginTop: 8 }} onSubmit={handleSubmit}>
+                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                                <Input label="Company Name *" placeholder="Enter your company name" value={startupName} onChange={(e) => setStartupName(e.target.value)} />
+                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} />
+                                <Input label="Website" placeholder="https://yourcompany.com" value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} />
                                 <div style={{ marginBottom: 14 }}>
                                     <label
                                         style={{
@@ -107,12 +161,14 @@ const StartupsJoin: FC = () => {
                                             fontFamily: 'inherit',
                                         }}
                                         placeholder="Description"
+                                        value={aboutUs}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAboutUs(e.target.value)}
                                     />
                                 </div>
-                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} />
-                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} />
+                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={(e) => setPassword(e.target.value)} />
+                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
 
-                                <button type="button" style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>Create Startup Account</button>
+                                <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading ? 'Đang tạo...' : 'Create Startup Account'}</button>
                             </form>
                         </div>
 

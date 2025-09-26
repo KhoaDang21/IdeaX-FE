@@ -1,29 +1,32 @@
-import type { FC } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { DollarOutlined, ThunderboltOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons'
-import { useState } from 'react'
-import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
+import type { FC, ChangeEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { DollarOutlined, ThunderboltOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
+import { useState } from 'react';
+import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg';
+import { useDispatch, useSelector } from 'react-redux';
+import { registerInvestor } from '../services/features/auth/authSlice';
+import { message } from 'antd';
 
-type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void }
-const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick }) => (
+type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void };
+const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange }) => (
     <div style={{ marginBottom: 14 }}>
         <label style={{ display: 'block', color: '#34419A', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{label}</label>
         <div style={{ position: 'relative' }}>
-            <input type={type} placeholder={placeholder} style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: '1px solid #34419A', borderRadius: 10, outline: 'none', color: '#34419A' }} />
+            <input type={type} placeholder={placeholder} value={value} onChange={onChange} style={{ width: '100%', padding: '10px 12px', paddingRight: rightIcon ? 36 : 12, border: '1px solid #34419A', borderRadius: 10, outline: 'none', color: '#34419A' }} />
             {rightIcon && (
                 <button type="button" onClick={onRightIconClick} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 0, cursor: 'pointer', color: '#64748b' }}>{rightIcon}</button>
             )}
         </div>
     </div>
-)
+);
 
-const Select: FC<{ label: string; placeholder?: string; options: string[] }> = ({ label, placeholder, options }) => (
+type SelectProps = { label: string; placeholder?: string; options: string[]; value?: string; onChange?: (e: ChangeEvent<HTMLSelectElement>) => void };
+const Select: FC<SelectProps> = ({ label, placeholder, options, value, onChange }) => (
     <div style={{ marginBottom: 14 }}>
-        <label style={{ display: 'block', color: '#34419A', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
-            {label}
-        </label>
+        <label style={{ display: 'block', color: '#34419A', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{label}</label>
         <select
-            defaultValue=""
+            value={value}
+            onChange={onChange}
             style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -34,30 +37,75 @@ const Select: FC<{ label: string; placeholder?: string; options: string[] }> = (
                 color: '#34419A',
             }}
         >
-            <option value="" disabled hidden style={{ color: '#94a3b8' }}>
-                {placeholder}
-            </option>
+            <option value="" disabled hidden style={{ color: '#94a3b8' }}>{placeholder}</option>
             {options.map((opt) => (
-                <option key={opt} value={opt}>
-                    {opt}
-                </option>
+                <option key={opt} value={opt}>{opt}</option>
             ))}
         </select>
-
     </div>
-)
+);
 
 const Bullet: FC<{ children: React.ReactNode }> = ({ children }) => (
     <li style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#334155' }}>
         <span style={{ color: '#16a34a' }}>✓</span>
         <span>{children}</span>
     </li>
-)
+);
 
 const InvestorsJoin: FC = () => {
-    const [showPwd, setShowPwd] = useState(false)
-    const [showPwd2, setShowPwd2] = useState(false)
-    const navigate = useNavigate()
+    const [showPwd, setShowPwd] = useState(false);
+    const [showPwd2, setShowPwd2] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [fullName, setFullName] = useState('');
+    const [organization, setOrganization] = useState('');
+    const [investmentFocus, setInvestmentFocus] = useState('');
+    const [investmentRange, setInvestmentRange] = useState('');
+    const [investmentExperience, setInvestmentExperience] = useState('');
+    const dispatch = useDispatch();
+    const loading = useSelector((state: any) => state.auth.loading);
+    const navigate = useNavigate();
+
+    const validateEmail = (email: string) => {
+        return /^\S+@\S+\.\S+$/.test(email);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+            message.error('Vui lòng nhập đầy đủ các trường bắt buộc.');
+            return;
+        }
+        if (!validateEmail(email)) {
+            message.error('Email không hợp lệ.');
+            return;
+        }
+        if (password.length < 6) {
+            message.error('Mật khẩu phải có ít nhất 6 ký tự.');
+            return;
+        }
+        if (password !== confirmPassword) {
+            message.error('Mật khẩu xác nhận không khớp.');
+            return;
+        }
+        try {
+            await (dispatch as any)(registerInvestor({
+                email,
+                password,
+                confirmPassword,
+                fullName,
+                organization,
+                investmentFocus,
+                investmentRange,
+                investmentExperience
+            })).unwrap();
+            navigate('/login');
+        } catch (err) {
+            // error toast handled in slice
+        }
+    };
+
     return (
         <main>
             <header style={{ background: '#fff', borderBottom: '1px solid #eef2f7' }}>
@@ -119,10 +167,10 @@ const InvestorsJoin: FC = () => {
                                 <Bullet>Direct communication with founders</Bullet>
                             </ul>
 
-                            <form style={{ marginTop: 8 }}>
-                                <Input label="Full Name *" placeholder="Enter your full name" />
-                                <Input label="Investment Firm/Organization" placeholder="Enter your firm or organization name" />
-                                <Input label="Email Address *" type="email" placeholder="Enter your email address" />
+                            <form style={{ marginTop: 8 }} onSubmit={handleSubmit}>
+                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={e => setFullName(e.target.value)} />
+                                <Input label="Investment Firm/Organization" placeholder="Enter your firm or organization name" value={organization} onChange={e => setOrganization(e.target.value)} />
+                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={e => setEmail(e.target.value)} />
                                 <Select label="Investment Focus" placeholder="Select investment focus" options={[
                                     'Technology & Software',
                                     'Healthcare & Biotech',
@@ -136,7 +184,7 @@ const InvestorsJoin: FC = () => {
                                     'Transportation & Logistics',
                                     'Agriculture & FoodTech',
                                     'Other'
-                                ]} />
+                                ]} value={investmentFocus} onChange={e => setInvestmentFocus(e.target.value)} />
                                 <Select label="Investment Range" placeholder="Select investment range" options={[
                                     '$10K - $50K',
                                     '$50K - $100K',
@@ -147,11 +195,11 @@ const InvestorsJoin: FC = () => {
                                     '$2.5M - $5M',
                                     '$5M - $10M',
                                     '$10M+'
-                                ]} />
-                                <Input label="Investment Experience" placeholder="Enter your investment experience" />
-                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} />
-                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} />
-                                <button type="button" style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>Create Investor Account</button>
+                                ]} value={investmentRange} onChange={e => setInvestmentRange(e.target.value)} />
+                                <Input label="Investment Experience" placeholder="Enter your investment experience" value={investmentExperience} onChange={e => setInvestmentExperience(e.target.value)} />
+                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={e => setPassword(e.target.value)} />
+                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                                <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading ? 'Đang tạo...' : 'Create Investor Account'}</button>
                             </form>
                         </div>
                     </div>

@@ -1,10 +1,13 @@
-import type { FC } from 'react'
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
-import { ThunderboltOutlined, DollarOutlined, SafetyOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons'
+import type { FC, ChangeEvent, FormEvent } from 'react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg';
+import { ThunderboltOutlined, DollarOutlined, SafetyOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../services/features/auth/authSlice';
+import { message } from 'antd';
 
-const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; color?: string }> = ({ label, type = 'text', placeholder, rightIcon, onRightIconClick, color = '#34419A' }) => {
+const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; color?: string; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void }> = ({ label, type = 'text', placeholder, rightIcon, onRightIconClick, color = '#34419A', value, onChange }) => {
     return (
         <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', color, fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{label}</label>
@@ -12,6 +15,8 @@ const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?
                 <input
                     type={type}
                     placeholder={placeholder}
+                    value={value}
+                    onChange={onChange}
                     style={{
                         width: '100%',
                         padding: '12px 14px',
@@ -33,7 +38,38 @@ const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?
 }
 
 const Login: FC = () => {
-    const [showPassword, setShowPassword] = useState(false)
+    const [showPassword, setShowPassword] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const dispatch = useDispatch();
+    const loading = useSelector((state: any) => state.auth.loading);
+    const user = useSelector((state: any) => state.auth.user);
+    const navigate = useNavigate();
+
+    const validateEmail = (email: string) => {
+        return /^\S+@\S+\.\S+$/.test(email);
+    };
+
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!email.trim() || !password.trim()) {
+            message.error('Vui lòng nhập đầy đủ email và mật khẩu.');
+            return;
+        }
+        if (!validateEmail(email)) {
+            message.error('Email không hợp lệ.');
+            return;
+        }
+        dispatch(loginUser({ email, password }) as any);
+    };
+
+    // Redirect based on role after successful login
+    useEffect(() => {
+        if (!user) return;
+        if (user.role === 'startup') navigate('/startup/dashboard');
+        else if (user.role === 'investor') navigate('/investor/find-projects');
+        else if (user.role === 'admin') navigate('/admin/user-management');
+    }, [user, navigate]);
     return (
         <main>
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '100vh' }}>
@@ -46,17 +82,19 @@ const Login: FC = () => {
                         <h1 style={{ textAlign: 'center', margin: '0 0 6px', color: '#34419A' }}>Welcome Back</h1>
                         <p style={{ textAlign: 'center', margin: '0 0 24px', color: '#64748b' }}>Sign in to your account</p>
 
-                        <Input label="Email Address" type="email" placeholder="Enter your email address" color="#34419A" />
-                        <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" rightIcon={showPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPassword((v) => !v)} color="#34419A" />
+                        <form onSubmit={handleSubmit}>
+                            <Input label="Email Address" type="email" placeholder="Enter your email address" color="#34419A" value={email} onChange={e => setEmail(e.target.value)} />
+                            <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" rightIcon={showPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPassword((v) => !v)} color="#34419A" value={password} onChange={e => setPassword(e.target.value)} />
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 14 }}>
+                                    <input type="checkbox" /> Remember me
+                                </label>
+                                <Link to="#" style={{ color: '#4f46e5', fontSize: 14, textDecoration: 'none' }}>Forgot your password?</Link>
+                            </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 14 }}>
-                                <input type="checkbox" /> Remember me
-                            </label>
-                            <Link to="#" style={{ color: '#4f46e5', fontSize: 14, textDecoration: 'none' }}>Forgot your password?</Link>
-                        </div>
-
-                        <button style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer' }}>Sign In</button>
+                            <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading ? 'Đang nhập...' : 'Sign In'}</button>
+                        </form>
 
                         <p style={{ textAlign: 'center', margin: '16px 0', color: '#64748b', fontSize: 14 }}>Or continue with</p>
                         <div style={{ display: 'flex', gap: 12 }}>
@@ -133,5 +171,3 @@ const Login: FC = () => {
 }
 
 export default Login
-
-
