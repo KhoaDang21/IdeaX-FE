@@ -4,6 +4,7 @@ import { DollarOutlined, ThunderboltOutlined, EyeInvisibleOutlined, EyeOutlined 
 import { useState } from 'react';
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg';
 import { useDispatch, useSelector } from 'react-redux';
+import type { TypedUseSelectorHook } from 'react-redux';
 import { registerInvestor } from '../services/features/auth/authSlice';
 import { message } from 'antd';
 
@@ -63,9 +64,13 @@ const InvestorsJoin: FC = () => {
     const [investmentFocus, setInvestmentFocus] = useState('');
     const [investmentRange, setInvestmentRange] = useState('');
     const [investmentExperience, setInvestmentExperience] = useState('');
+    // Define RootState for type safety
+    type RootState = { auth: { loading: boolean } };
+    const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
     const dispatch = useDispatch();
-    const loading = useSelector((state: any) => state.auth.loading);
+    const loading = useTypedSelector(state => state.auth.loading);
     const navigate = useNavigate();
+    const [submitting, setSubmitting] = useState(false);
 
     const validateEmail = (email: string) => {
         return /^\S+@\S+\.\S+$/.test(email);
@@ -73,22 +78,36 @@ const InvestorsJoin: FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-            message.error('Vui lòng nhập đầy đủ các trường bắt buộc.');
+        if (!fullName.trim()) {
+            message.error('Vui lòng nhập họ tên.');
+            return;
+        }
+        if (!email.trim()) {
+            message.error('Vui lòng nhập email.');
             return;
         }
         if (!validateEmail(email)) {
             message.error('Email không hợp lệ.');
             return;
         }
-        if (password.length < 6) {
+        if (!password.trim()) {
+            message.error('Vui lòng nhập mật khẩu.');
+            return;
+        }
+         if (password.length < 6) {
             message.error('Mật khẩu phải có ít nhất 6 ký tự.');
+            return;
+        }
+        if (!confirmPassword.trim()) {
+            message.error('Vui lòng nhập xác nhận mật khẩu.');
             return;
         }
         if (password !== confirmPassword) {
             message.error('Mật khẩu xác nhận không khớp.');
             return;
         }
+        setSubmitting(true);
+        message.loading({ content: 'Đang tạo tài khoản...', key: 'register', duration: 0 });
         try {
             await (dispatch as any)(registerInvestor({
                 email,
@@ -100,9 +119,12 @@ const InvestorsJoin: FC = () => {
                 investmentRange,
                 investmentExperience
             })).unwrap();
-            navigate('/login');
+            message.success({ content: 'Tạo tài khoản thành công! Vui lòng đăng nhập.', key: 'register' });
+            setTimeout(() => navigate('/login'), 1000);
         } catch (err) {
-            // error toast handled in slice
+            message.error({ content: 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -199,7 +221,7 @@ const InvestorsJoin: FC = () => {
                                 <Input label="Investment Experience" placeholder="Enter your investment experience" value={investmentExperience} onChange={e => setInvestmentExperience(e.target.value)} />
                                 <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={e => setPassword(e.target.value)} />
                                 <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
-                                <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading ? 'Đang tạo...' : 'Create Investor Account'}</button>
+                                <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang tạo...' : 'Create Investor Account'}</button>
                             </form>
                         </div>
                     </div>

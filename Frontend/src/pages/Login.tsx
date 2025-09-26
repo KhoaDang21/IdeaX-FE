@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg';
 import { ThunderboltOutlined, DollarOutlined, SafetyOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
+import type { TypedUseSelectorHook } from 'react-redux';
 import { loginUser } from '../services/features/auth/authSlice';
 import { message } from 'antd';
 
@@ -41,10 +42,13 @@ const Login: FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    type RootState = { auth: { loading: boolean; user?: { role?: string } } };
+    const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
     const dispatch = useDispatch();
-    const loading = useSelector((state: any) => state.auth.loading);
-    const user = useSelector((state: any) => state.auth.user);
+    const loading = useTypedSelector(state => state.auth.loading);
+    const user = useTypedSelector(state => state.auth.user);
     const navigate = useNavigate();
+    const [submitting, setSubmitting] = useState(false);
 
     const validateEmail = (email: string) => {
         return /^\S+@\S+\.\S+$/.test(email);
@@ -52,15 +56,33 @@ const Login: FC = () => {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        if (!email.trim() || !password.trim()) {
-            message.error('Vui lòng nhập đầy đủ email và mật khẩu.');
+        if (!email.trim()) {
+            message.error('Vui lòng nhập email.');
             return;
         }
         if (!validateEmail(email)) {
             message.error('Email không hợp lệ.');
             return;
         }
-        dispatch(loginUser({ email, password }) as any);
+        if (!password.trim()) {
+            message.error('Vui lòng nhập mật khẩu.');
+            return;
+        }
+        if (password.length < 6) {
+            message.error('Mật khẩu phải có ít nhất 6 ký tự.');
+            return;
+        }
+        setSubmitting(true);
+        message.loading({ content: 'Đang đăng nhập...', key: 'login', duration: 0 });
+        (dispatch(loginUser({ email, password }) as any))
+            .unwrap()
+            .then(() => {
+                message.success({ content: 'Đăng nhập thành công!', key: 'login' });
+            })
+            .catch(() => {
+                message.error({ content: 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.', key: 'login' });
+            })
+            .finally(() => setSubmitting(false));
     };
 
     // Redirect based on role after successful login
@@ -93,7 +115,7 @@ const Login: FC = () => {
                                 <Link to="#" style={{ color: '#4f46e5', fontSize: 14, textDecoration: 'none' }}>Forgot your password?</Link>
                             </div>
 
-                            <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading ? 'Đang nhập...' : 'Sign In'}</button>
+                            <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang nhập...' : 'Sign In'}</button>
                         </form>
 
                         <p style={{ textAlign: 'center', margin: '16px 0', color: '#64748b', fontSize: 14 }}>Or continue with</p>
