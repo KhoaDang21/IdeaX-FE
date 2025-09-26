@@ -1,4 +1,5 @@
 import type { FC, ChangeEvent } from 'react';
+import { App } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
 import { DollarOutlined, ThunderboltOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
 import { useState } from 'react';
@@ -6,7 +7,6 @@ import logo from '../assets/images/541447718_1863458311190035_821270648510958033
 import { useDispatch, useSelector } from 'react-redux';
 import type { TypedUseSelectorHook } from 'react-redux';
 import { registerInvestor } from '../services/features/auth/authSlice';
-import { message } from 'antd';
 
 type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void; error?: string };
 const Input: FC<InputProps> = ({ label, placeholder, type = 'text', rightIcon, onRightIconClick, value, onChange, error }) => (
@@ -55,6 +55,7 @@ const Bullet: FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const InvestorsJoin: FC = () => {
+    const { message } = App.useApp();
     const [showPwd, setShowPwd] = useState(false);
     const [showPwd2, setShowPwd2] = useState(false);
     const [email, setEmail] = useState('');
@@ -80,40 +81,23 @@ const InvestorsJoin: FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setErrors({});
-        if (!fullName.trim()) {
-            message.error('Vui lòng nhập họ tên.');
-            setErrors(prev => ({ ...prev, fullName: 'Vui lòng nhập họ tên' }));
-            return;
-        }
-        if (!email.trim()) {
-            message.error('Vui lòng nhập email.');
-            setErrors(prev => ({ ...prev, email: 'Vui lòng nhập email' }));
-            return;
-        }
-        if (!validateEmail(email)) {
-            message.error('Email không hợp lệ.');
-            setErrors(prev => ({ ...prev, email: 'Email không hợp lệ' }));
-            return;
-        }
-        if (!password.trim()) {
-            message.error('Vui lòng nhập mật khẩu.');
-            setErrors(prev => ({ ...prev, password: 'Vui lòng nhập mật khẩu' }));
-            return;
-        }
-         if (password.length < 6) {
-            message.error('Mật khẩu phải có ít nhất 6 ký tự.');
-            setErrors(prev => ({ ...prev, password: 'Mật khẩu tối thiểu 6 ký tự' }));
-            return;
-        }
-        if (!confirmPassword.trim()) {
-            message.error('Vui lòng nhập xác nhận mật khẩu.');
-            setErrors(prev => ({ ...prev, confirmPassword: 'Vui lòng nhập xác nhận mật khẩu' }));
-            return;
-        }
-        if (password !== confirmPassword) {
-            message.error('Mật khẩu xác nhận không khớp.');
-            setErrors(prev => ({ ...prev, confirmPassword: 'Mật khẩu xác nhận không khớp' }));
+        let newErrors: Record<string, string> = {};
+        if (!fullName.trim()) newErrors.fullName = 'Vui lòng nhập họ tên';
+        if (!email.trim()) newErrors.email = 'Vui lòng nhập email';
+        else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
+        if (!password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu';
+        else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
+        if (!confirmPassword.trim()) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
+        else if (password !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+        // Validate các field optional nhưng vẫn báo nếu trống (nếu muốn bắt buộc)
+        // if (!organization.trim()) newErrors.organization = 'Vui lòng nhập tổ chức';
+        // if (!investmentFocus.trim()) newErrors.investmentFocus = 'Vui lòng chọn lĩnh vực đầu tư';
+        // if (!investmentRange.trim()) newErrors.investmentRange = 'Vui lòng chọn khoảng đầu tư';
+        // if (!investmentExperience.trim()) newErrors.investmentExperience = 'Vui lòng nhập kinh nghiệm đầu tư';
+
+        setErrors(newErrors);
+        if (Object.keys(newErrors).length > 0) {
+            message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
             return;
         }
         setSubmitting(true);
@@ -130,7 +114,7 @@ const InvestorsJoin: FC = () => {
                 investmentExperience
             })).unwrap();
             message.success({ content: 'Tạo tài khoản thành công! Vui lòng đăng nhập.', key: 'register' });
-            setTimeout(() => navigate('/login'), 1000);
+            setTimeout(() => navigate('/login'), 1200);
         } catch (err) {
             message.error({ content: 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
         } finally {

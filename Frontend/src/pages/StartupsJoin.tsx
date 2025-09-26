@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { message } from 'antd'
+import { App } from 'antd'
 import { Link, useNavigate } from 'react-router-dom'
 import { ThunderboltOutlined, DollarOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState } from 'react'
@@ -41,6 +41,7 @@ const Bullet: FC<{ children: React.ReactNode }> = ({ children }) => (
 )
 
 const StartupsJoin: FC = () => {
+    const { message } = App.useApp();
     const [showPwd, setShowPwd] = useState(false)
     const [showPwd2, setShowPwd2] = useState(false)
     const [email, setEmail] = useState('')
@@ -79,50 +80,19 @@ const StartupsJoin: FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setErrors({});
-        if (!fullName.trim()) {
-            message.error('Vui lòng nhập họ tên.');
-            setErrors(prev => ({ ...prev, fullName: 'Vui lòng nhập họ tên' }));
-            return;
-        }
-        if (!startupName.trim()) {
-            message.error('Vui lòng nhập tên công ty.');
-            setErrors(prev => ({ ...prev, startupName: 'Vui lòng nhập tên công ty' }));
-            return;
-        }
-        if (!email.trim()) {
-            message.error('Vui lòng nhập email.');
-            setErrors(prev => ({ ...prev, email: 'Vui lòng nhập email' }));
-            return;
-        }
-        if (!validateEmail(email)) {
-            message.error('Email không hợp lệ.');
-            setErrors(prev => ({ ...prev, email: 'Email không hợp lệ' }));
-            return;
-        }
-        if (!validateUrl(companyWebsite)) {
-            message.error('Website không hợp lệ. Vui lòng nhập URL hợp lệ (ví dụ: https://yourcompany.com).');
-            setErrors(prev => ({ ...prev, companyWebsite: 'Website không hợp lệ' }));
-            return;
-        }
-        if (!password.trim()) {
-            message.error('Vui lòng nhập mật khẩu.');
-            setErrors(prev => ({ ...prev, password: 'Vui lòng nhập mật khẩu' }));
-            return;
-        }
-        if (password.length < 6) {
-            message.error('Mật khẩu phải có ít nhất 6 ký tự.');
-            setErrors(prev => ({ ...prev, password: 'Mật khẩu tối thiểu 6 ký tự' }));
-            return;
-        }
-        if (!confirmPassword.trim()) {
-            message.error('Vui lòng nhập xác nhận mật khẩu.');
-            setErrors(prev => ({ ...prev, confirmPassword: 'Vui lòng nhập xác nhận mật khẩu' }));
-            return;
-        }
-        if (password !== confirmPassword) {
-            message.error('Mật khẩu xác nhận không khớp.');
-            setErrors(prev => ({ ...prev, confirmPassword: 'Mật khẩu xác nhận không khớp' }));
+        let newErrors: Record<string, string> = {};
+        if (!fullName.trim()) newErrors.fullName = 'Vui lòng nhập họ tên';
+        if (!startupName.trim()) newErrors.startupName = 'Vui lòng nhập tên công ty';
+        if (!email.trim()) newErrors.email = 'Vui lòng nhập email';
+        else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
+        if (companyWebsite && !validateUrl(companyWebsite)) newErrors.companyWebsite = 'Website không hợp lệ';
+        if (!password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu';
+        else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
+        if (!confirmPassword.trim()) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
+        else if (password !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+        setErrors(newErrors);
+        if (Object.keys(newErrors).length > 0) {
+            message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
             return;
         }
         setSubmitting(true);
@@ -138,7 +108,7 @@ const StartupsJoin: FC = () => {
                 aboutUs
             })).unwrap();
             message.success({ content: 'Tạo tài khoản thành công! Vui lòng đăng nhập.', key: 'register' });
-            setTimeout(() => navigate('/login'), 1000);
+            setTimeout(() => navigate('/login'), 1200);
         } catch (err) {
             message.error({ content: 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
         } finally {

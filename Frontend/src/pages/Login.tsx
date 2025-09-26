@@ -6,7 +6,7 @@ import { ThunderboltOutlined, DollarOutlined, SafetyOutlined, EyeInvisibleOutlin
 import { useDispatch, useSelector } from 'react-redux';
 import type { TypedUseSelectorHook } from 'react-redux';
 import { loginUser } from '../services/features/auth/authSlice';
-import { message } from 'antd';
+import { App } from 'antd';
 
 const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; color?: string; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void; error?: string }> = ({ label, type = 'text', placeholder, rightIcon, onRightIconClick, color = '#34419A', value, onChange, error }) => {
     return (
@@ -40,6 +40,7 @@ const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?
 }
 
 const Login: FC = () => {
+    const { message } = App.useApp();
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -58,25 +59,14 @@ const Login: FC = () => {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        setErrors({});
-        if (!email.trim()) {
-            message.error('Vui lòng nhập email.');
-            setErrors(prev => ({ ...prev, email: 'Vui lòng nhập email' }));
-            return;
-        }
-        if (!validateEmail(email)) {
-            message.error('Email không hợp lệ.');
-            setErrors(prev => ({ ...prev, email: 'Email không hợp lệ' }));
-            return;
-        }
-        if (!password.trim()) {
-            message.error('Vui lòng nhập mật khẩu.');
-            setErrors(prev => ({ ...prev, password: 'Vui lòng nhập mật khẩu' }));
-            return;
-        }
-        if (password.length < 6) {
-            message.error('Mật khẩu phải có ít nhất 6 ký tự.');
-            setErrors(prev => ({ ...prev, password: 'Mật khẩu tối thiểu 6 ký tự' }));
+        let newErrors: Record<string, string> = {};
+        if (!email.trim()) newErrors.email = 'Vui lòng nhập email';
+        else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
+        if (!password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu';
+        else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
+        setErrors(newErrors);
+        if (Object.keys(newErrors).length > 0) {
+            message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
             return;
         }
         setSubmitting(true);
