@@ -8,10 +8,19 @@ export interface User {
   email: string;
   fullName: string;
   role: UserRole;
-  startupName?: string;
+  // Startup fields
+  phoneNumber?: string;
+  linkedInProfile?: string;
   companyWebsite?: string;
+  profilePictureUrl?: string;
   companyLogo?: string;
+  startupName?: string;
+  industryCategory?: string;
+  fundingStage?: string;
+  location?: string;
+  numberOfTeamMembers?: number;
   aboutUs?: string;
+  // Investor fields
   organization?: string;
   investmentFocus?: string;
   investmentRange?: string;
@@ -45,6 +54,32 @@ export interface InvestorRegisterCredentials {
   investmentExperience?: string;
 }
 
+export interface StartupProfileResponse {
+  id?: number;
+  fullName: string;
+  phoneNumber?: string;
+  linkedInProfile?: string;
+  companyWebsite?: string;
+  profilePictureUrl?: string;
+  companyLogo?: string;
+  startupName?: string;
+  industryCategory?: string;
+  fundingStage?: string;
+  location?: string;
+  numberOfTeamMembers?: number;
+  aboutUs?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InvestorProfileResponse {
+  fullName: string;
+  organization?: string;
+  investmentFocus?: string;
+  investmentRange?: string;
+  investmentExperience?: string;
+}
+
 export interface LoginResponse {
   account: {
     id: number;
@@ -53,8 +88,8 @@ export interface LoginResponse {
     status: string;
     token: string;
   };
-  startupProfile?: any;
-  investorProfile?: any;
+  startupProfile?: StartupProfileResponse;
+  investorProfile?: InvestorProfileResponse;
 }
 
 export interface AuthState {
