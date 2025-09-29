@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { FiBell } from 'react-icons/fi'
+import { BellOutlined } from '@ant-design/icons'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
 const AdminHeader: FC = () => {
@@ -34,7 +34,7 @@ const AdminHeader: FC = () => {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 18, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
-                        <FiBell size={18} color="#111" />
+                        <BellOutlined style={{ fontSize: 18, color: '#111' }} />
                     </div>
                     <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#34419A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
                         AD
