@@ -62,21 +62,34 @@ const StartupSidebar: FC = () => {
             {/* User Card */}
             <div style={{ ...card, padding: 16, marginBottom: 18 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div
-                        style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 22,
-                            background: '#34419A',
-                            color: '#fff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 800
-                        }}
-                    >
-                        {getInitials(user?.fullName, user?.email)}
-                    </div>
+                    {user?.profilePictureUrl ? (
+                        <img
+                            src={user.profilePictureUrl}
+                            alt="avatar"
+                            style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 22,
+                                objectFit: 'cover'
+                            }}
+                        />
+                    ) : (
+                        <div
+                            style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 22,
+                                background: '#34419A',
+                                color: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800
+                            }}
+                        >
+                            {getInitials(user?.fullName, user?.email)}
+                        </div>
+                    )}
                     <div>
                         <div style={{ color: '#0f172a', fontWeight: 700 }}>
                             {user?.fullName || user?.email || 'User'}
