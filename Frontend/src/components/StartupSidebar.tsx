@@ -1,6 +1,8 @@
 import type { FC, CSSProperties, ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Folder, Briefcase, Users, User, CreditCard, Plus, FileText, MessageCircle } from 'lucide-react'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../store'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
 const card: CSSProperties = {
@@ -15,6 +17,7 @@ const NavItem: FC<{ to: string; icon: ReactNode; label: string }> = ({ to, icon,
     return (
         <Link
             to={to}
+            state={{ skipDelay: true }}
             style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -36,6 +39,19 @@ const NavItem: FC<{ to: string; icon: ReactNode; label: string }> = ({ to, icon,
 }
 
 const StartupSidebar: FC = () => {
+    const { user } = useSelector((state: RootState) => state.auth)
+
+    // Lấy initials từ fullName hoặc email
+    const getInitials = (name: string | undefined, email: string | undefined) => {
+        if (name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        }
+        if (email) {
+            return email.slice(0, 2).toUpperCase()
+        }
+        return 'U'
+    }
+
     return (
         <aside style={{ width: 260, padding: 16, background: '#DBEAFE' }}>
             {/* Logo */}
@@ -59,11 +75,15 @@ const StartupSidebar: FC = () => {
                             fontWeight: 800
                         }}
                     >
-                        JS
+                        {getInitials(user?.fullName, user?.email)}
                     </div>
                     <div>
-                        <div style={{ color: '#0f172a', fontWeight: 700 }}>John Smith</div>
-                        <div style={{ color: '#6b7280', fontSize: 13 }}>TechStart Inc.</div>
+                        <div style={{ color: '#0f172a', fontWeight: 700 }}>
+                            {user?.fullName || user?.email || 'User'}
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: 13 }}>
+                            {user?.startupName || 'Startup'}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -5,7 +5,7 @@ import logo from '../assets/images/541447718_1863458311190035_821270648510958033
 import { ThunderboltOutlined, DollarOutlined, SafetyOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import type { TypedUseSelectorHook } from 'react-redux';
-import { loginUser } from '../services/features/auth/authSlice';
+import { loginUser, getStartupProfile } from '../services/features/auth/authSlice';
 import { App } from 'antd';
 
 const Input: FC<{ label: string; type?: string; placeholder?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; color?: string; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void; error?: string }> = ({ label, type = 'text', placeholder, rightIcon, onRightIconClick, color = '#34419A', value, onChange, error }) => {
@@ -44,7 +44,7 @@ const Login: FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    type RootState = { auth: { loading: boolean; user?: { role?: string } } };
+    type RootState = { auth: { loading: boolean; user?: { role?: string; id?: string } } };
     const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
     const dispatch = useDispatch();
     const loading = useTypedSelector(state => state.auth.loading);
@@ -85,10 +85,17 @@ const Login: FC = () => {
     // Redirect based on role after successful login
     useEffect(() => {
         if (!user) return;
-        if (user.role === 'startup') navigate('/startup/dashboard');
-        else if (user.role === 'investor') navigate('/investor/find-projects');
-        else if (user.role === 'admin') navigate('/admin/user-management');
-    }, [user, navigate]);
+        if (user.role === 'startup') {
+            if (user.id) {
+                (dispatch(getStartupProfile(user.id) as any));
+            }
+            navigate('/startup/dashboard');
+        } else if (user.role === 'investor') {
+            navigate('/investor/find-projects');
+        } else if (user.role === 'admin') {
+            navigate('/admin/user-management');
+        }
+    }, [user, navigate, dispatch]);
     return (
         <main>
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '100vh' }}>
@@ -104,7 +111,7 @@ const Login: FC = () => {
                         <form onSubmit={handleSubmit}>
                             <Input label="Email Address" type="email" placeholder="Enter your email address" color="#34419A" value={email} onChange={e => setEmail(e.target.value)} error={(errors as any).email} />
                             <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" rightIcon={showPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPassword((v) => !v)} color="#34419A" value={password} onChange={e => setPassword(e.target.value)} error={(errors as any).password} />
-                            
+
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 14 }}>
                                     <input type="checkbox" /> Remember me
@@ -140,7 +147,7 @@ const Login: FC = () => {
                             </button>
                         </div>
 
-                        <p style={{ textAlign: 'center', marginTop: 14, color: '#64748b', fontSize: 14 }}>Don't have an account? <Link to="#" style={{ color: '#4f46e5', textDecoration: 'none' }}>Sign up for free</Link></p>
+                        <p style={{ textAlign: 'center', marginTop: 14, color: '#64748b', fontSize: 14 }}>Don't have an account? <Link to="/start" style={{ color: '#4f46e5', textDecoration: 'none' }}>Sign up for free</Link></p>
                         <p style={{ textAlign: 'center', marginTop: 8 }}>
                             <Link to="/" style={{ color: '#64748b', textDecoration: 'none' }}>← Back to Home</Link>
                         </p>
