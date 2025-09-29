@@ -87,13 +87,8 @@ const Profile: React.FC = () => {
       if (!user?.id) throw new Error('User not found');
       const resp = await api.upload<any>(STARTUP_PROFILE_UPLOAD_ENDPOINT(user.id), formData);
       const data = resp.data;
-      // backend returns updated StartupProfile entity (or fallback to path)
-      let url = '';
-      if (typeof data === 'string') {
-        url = data.startsWith('http') ? data : `${BASE_URL}${data}`;
-        setForm(prev => ({ ...prev, profilePictureUrl: url }));
-      } else if (data && data.profilePictureUrl) {
-        url = data.profilePictureUrl.startsWith('http') ? data.profilePictureUrl : `${BASE_URL}${data.profilePictureUrl}`;
+      if (data && data.profilePictureUrl) {
+        const url = data.profilePictureUrl.startsWith('http') ? data.profilePictureUrl : `${BASE_URL}${data.profilePictureUrl}`;
         setForm(prev => ({ ...prev, profilePictureUrl: url }));
       }
 
