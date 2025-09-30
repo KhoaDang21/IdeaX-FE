@@ -70,24 +70,40 @@ const InvestorsJoin: FC = () => {
     type RootState = { auth: { loading: boolean } };
     const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
     const dispatch = useDispatch();
-    const loading = useTypedSelector(state => state.auth.loading);
+    // using local `submitting` to control submit state; global loading is not used here
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const validateEmail = (email: string) => {
+    const validateEmail = (value: string) => {
+        const email = (value || '').trim();
         return /^\S+@\S+\.\S+$/.test(email);
+    };
+
+    // Clear a specific field error when user types
+    const onChangeField = (setter: (v: string) => void, field?: string) => (e: ChangeEvent<HTMLInputElement>) => {
+        if (field) setErrors(prev => {
+            const copy = { ...prev };
+            delete (copy as any)[field];
+            return copy;
+        });
+        setter(e.target.value);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         let newErrors: Record<string, string> = {};
-        if (!fullName.trim()) newErrors.fullName = 'Vui lòng nhập họ tên';
-        if (!email.trim()) newErrors.email = 'Vui lòng nhập email';
-        else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
-        if (!password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu';
+        const trimmed = {
+            email: email.trim(),
+            fullName: fullName.trim(),
+        };
+
+        if (!trimmed.fullName) newErrors.fullName = 'Vui lòng nhập họ tên';
+        if (!trimmed.email) newErrors.email = 'Vui lòng nhập email';
+        else if (!validateEmail(trimmed.email)) newErrors.email = 'Email không hợp lệ';
+        if (!password) newErrors.password = 'Vui lòng nhập mật khẩu';
         else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
-        if (!confirmPassword.trim()) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
+        if (!confirmPassword) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
         else if (password !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
         // Validate các field optional nhưng vẫn báo nếu trống (nếu muốn bắt buộc)
         // if (!organization.trim()) newErrors.organization = 'Vui lòng nhập tổ chức';
@@ -104,10 +120,10 @@ const InvestorsJoin: FC = () => {
         message.loading({ content: 'Đang tạo tài khoản...', key: 'register', duration: 0 });
         try {
             await (dispatch as any)(registerInvestor({
-                email,
+                email: trimmed.email,
                 password,
                 confirmPassword,
-                fullName,
+                fullName: trimmed.fullName,
                 organization,
                 investmentFocus,
                 investmentRange,
@@ -115,12 +131,29 @@ const InvestorsJoin: FC = () => {
             })).unwrap();
             message.success({ content: 'Tạo tài khoản thành công! Vui lòng đăng nhập.', key: 'register' });
             setTimeout(() => navigate('/login'), 1200);
-        } catch (err) {
-            message.error({ content: 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
+        } catch (err: any) {
+            // unwrap() rejection may be an object with payload or message
+            const serverMsg = err?.payload?.message || err?.message || err?.response?.data?.message || String(err);
+            const serverErrors: Record<string, string> = {};
+            if (/email|already|exists|đã tồn tại/i.test(serverMsg)) {
+                serverErrors.email = serverMsg;
+            } else if (/password|mật khẩu/i.test(serverMsg)) {
+                serverErrors.password = serverMsg;
+            } else if (/confirm|khớp|match/i.test(serverMsg)) {
+                serverErrors.confirmPassword = serverMsg;
+            }
+            if (Object.keys(serverErrors).length) {
+                setErrors(prev => ({ ...prev, ...serverErrors }));
+                // replace loading message with field error so spinner/toast stops
+                message.error({ content: serverMsg || 'Tạo tài khoản thất bại', key: 'register' });
+            } else {
+                message.error({ content: serverMsg || 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
+            }
         } finally {
             setSubmitting(false);
         }
     };
+
 
     return (
         <main>
@@ -184,9 +217,9 @@ const InvestorsJoin: FC = () => {
                             </ul>
 
                             <form style={{ marginTop: 8 }} onSubmit={handleSubmit}>
-                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={e => setFullName(e.target.value)} error={errors.fullName} />
-                                <Input label="Investment Firm/Organization" placeholder="Enter your firm or organization name" value={organization} onChange={e => setOrganization(e.target.value)} />
-                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={e => setEmail(e.target.value)} error={errors.email} />
+                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={onChangeField(setFullName, 'fullName')} error={errors.fullName} />
+                                <Input label="Investment Firm/Organization" placeholder="Enter your firm or organization name" value={organization} onChange={onChangeField(setOrganization)} />
+                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={onChangeField(setEmail, 'email')} error={errors.email} />
                                 <Select label="Investment Focus" placeholder="Select investment focus" options={[
                                     'Technology & Software',
                                     'Healthcare & Biotech',
@@ -213,9 +246,9 @@ const InvestorsJoin: FC = () => {
                                     '$10M+'
                                 ]} value={investmentRange} onChange={e => setInvestmentRange(e.target.value)} />
                                 <Input label="Investment Experience" placeholder="Enter your investment experience" value={investmentExperience} onChange={e => setInvestmentExperience(e.target.value)} />
-                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={e => setPassword(e.target.value)} error={errors.password} />
-                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} error={errors.confirmPassword} />
-                                <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang tạo...' : 'Create Investor Account'}</button>
+                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={onChangeField(setPassword, 'password')} error={errors.password} />
+                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={onChangeField(setConfirmPassword, 'confirmPassword')} error={errors.confirmPassword} />
+                                <button type="submit" disabled={submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{submitting ? 'Đang tạo...' : 'Create Investor Account'}</button>
                             </form>
                         </div>
                     </div>

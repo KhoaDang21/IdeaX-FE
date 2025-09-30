@@ -78,18 +78,36 @@ const StartupsJoin: FC = () => {
         }
     };
 
+    // Clear a specific field error when user types
+    const onChangeField = (setter: (v: string) => void, field?: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (field) setErrors(prev => {
+            const copy = { ...prev };
+            delete (copy as any)[field];
+            return copy;
+        });
+        setter(e.target.value);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         let newErrors: Record<string, string> = {};
-        if (!fullName.trim()) newErrors.fullName = 'Vui lòng nhập họ tên';
-        if (!startupName.trim()) newErrors.startupName = 'Vui lòng nhập tên công ty';
-        if (!email.trim()) newErrors.email = 'Vui lòng nhập email';
-        else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
-        if (companyWebsite && !validateUrl(companyWebsite)) newErrors.companyWebsite = 'Website không hợp lệ';
-        if (!password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu';
+        const trimmed = {
+            email: email.trim(),
+            fullName: fullName.trim(),
+            startupName: startupName.trim(),
+            companyWebsite: companyWebsite.trim(),
+        };
+
+        if (!trimmed.fullName) newErrors.fullName = 'Vui lòng nhập họ tên';
+        if (!trimmed.startupName) newErrors.startupName = 'Vui lòng nhập tên công ty';
+        if (!trimmed.email) newErrors.email = 'Vui lòng nhập email';
+        else if (!validateEmail(trimmed.email)) newErrors.email = 'Email không hợp lệ';
+        if (trimmed.companyWebsite && !validateUrl(trimmed.companyWebsite)) newErrors.companyWebsite = 'Website không hợp lệ';
+        if (!password) newErrors.password = 'Vui lòng nhập mật khẩu';
         else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
-        if (!confirmPassword.trim()) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
+        if (!confirmPassword) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
         else if (password !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
             message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
@@ -99,18 +117,28 @@ const StartupsJoin: FC = () => {
         message.loading({ content: 'Đang tạo tài khoản...', key: 'register', duration: 0 });
         try {
             await (dispatch as any)(registerStartup({
-                email,
+                email: trimmed.email,
                 password,
                 confirmPassword,
-                fullName,
-                startupName,
-                companyWebsite,
+                fullName: trimmed.fullName,
+                startupName: trimmed.startupName,
+                companyWebsite: trimmed.companyWebsite,
                 aboutUs
             })).unwrap();
             message.success({ content: 'Tạo tài khoản thành công! Vui lòng đăng nhập.', key: 'register' });
             setTimeout(() => navigate('/login'), 1200);
-        } catch (err) {
-            message.error({ content: 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
+        } catch (err: any) {
+            const serverMsg = err?.payload?.message || err?.message || err?.response?.data?.message || String(err);
+            const serverErrors: Record<string, string> = {};
+            if (/email|already|exists|đã tồn tại/i.test(serverMsg)) {
+                serverErrors.email = serverMsg;
+            } else if (/password|mật khẩu/i.test(serverMsg)) {
+                serverErrors.password = serverMsg;
+            }
+            if (Object.keys(serverErrors).length) {
+                setErrors(prev => ({ ...prev, ...serverErrors }));
+                message.error({ content: serverMsg || 'Tạo tài khoản thất bại', key: 'register' });
+            } else message.error({ content: serverMsg || 'Tạo tài khoản thất bại. Vui lòng thử lại.', key: 'register' });
         } finally {
             setSubmitting(false);
         }
@@ -157,10 +185,10 @@ const StartupsJoin: FC = () => {
                             </ul>
 
                             <form style={{ marginTop: 8 }} onSubmit={handleSubmit}>
-                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} error={errors.fullName} />
-                                <Input label="Company Name *" placeholder="Enter your company name" value={startupName} onChange={(e) => setStartupName(e.target.value)} error={errors.startupName} />
-                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
-                                <Input label="Website" placeholder="https://yourcompany.com" value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} error={errors.companyWebsite} />
+                                <Input label="Full Name *" placeholder="Enter your full name" value={fullName} onChange={onChangeField(setFullName, 'fullName')} error={errors.fullName} />
+                                <Input label="Company Name *" placeholder="Enter your company name" value={startupName} onChange={onChangeField(setStartupName, 'startupName')} error={errors.startupName} />
+                                <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={onChangeField(setEmail, 'email')} error={errors.email} />
+                                <Input label="Website" placeholder="https://yourcompany.com" value={companyWebsite} onChange={onChangeField(setCompanyWebsite, 'companyWebsite')} error={errors.companyWebsite} />
                                 <div style={{ marginBottom: 14 }}>
                                     <label
                                         style={{
@@ -190,10 +218,10 @@ const StartupsJoin: FC = () => {
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAboutUs(e.target.value)}
                                     />
                                 </div>
-                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
-                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} error={errors.confirmPassword} />
+                                <Input label="Password *" type={showPwd ? 'text' : 'password'} placeholder="Create a password" rightIcon={showPwd ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd((v) => !v)} value={password} onChange={onChangeField(setPassword, 'password')} error={errors.password} />
+                                <Input label="Confirm Password *" type={showPwd2 ? 'text' : 'password'} placeholder="Confirm your password" rightIcon={showPwd2 ? <EyeInvisibleOutlined /> : <EyeOutlined />} onRightIconClick={() => setShowPwd2((v) => !v)} value={confirmPassword} onChange={onChangeField(setConfirmPassword, 'confirmPassword')} error={errors.confirmPassword} />
 
-                                <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang tạo...' : 'Create Startup Account'}</button>
+                                <button type="submit" disabled={submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{submitting ? 'Đang tạo...' : 'Create Startup Account'}</button>
                             </form>
                         </div>
 

@@ -96,11 +96,9 @@ export const registerStartup = createAsyncThunk<
       const response = await api.post(REGISTER_STARTUP_ENDPOINT, data);
       return response.data;
     } catch (err: any) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Đăng ký startup thất bại";
-      return rejectWithValue({ message });
+        // Backend may return plain string with field errors or a message
+        const body = err.response?.data || err.message || "Đăng ký startup thất bại";
+        return rejectWithValue({ message: typeof body === 'string' ? body : JSON.stringify(body) });
     }
   }
 );
@@ -121,11 +119,8 @@ export const registerInvestor = createAsyncThunk<
       const response = await api.post(REGISTER_INVESTOR_ENDPOINT, data);
       return response.data;
     } catch (err: any) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Đăng ký investor thất bại";
-      return rejectWithValue({ message });
+        const body = err.response?.data || err.message || "Đăng ký investor thất bại";
+        return rejectWithValue({ message: typeof body === 'string' ? body : JSON.stringify(body) });
     }
   }
 );
