@@ -3,8 +3,7 @@ import { App } from 'antd'
 import { Link, useNavigate } from 'react-router-dom'
 import { ThunderboltOutlined, DollarOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import type { TypedUseSelectorHook } from 'react-redux'
+import { useDispatch } from 'react-redux'
 import { registerStartup } from '../services/features/auth/authSlice'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
@@ -51,13 +50,8 @@ const StartupsJoin: FC = () => {
     const [startupName, setStartupName] = useState('')
     const [companyWebsite, setCompanyWebsite] = useState('')
     const [aboutUs, setAboutUs] = useState('')
-    // Define RootState and AppDispatch types for type safety
-    // Try to import RootState and AppDispatch from the store if available
-    // Fallback to basic types if not available
-    type RootState = { auth: { loading: boolean } };
-    const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
     const dispatch = useDispatch();
-    const loading = useTypedSelector(state => state.auth.loading);
+    // loading not used in this component; omit to avoid unused var
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false)
     const [errors, setErrors] = useState<Record<string, string>>({})

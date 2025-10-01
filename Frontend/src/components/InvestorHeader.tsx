@@ -1,9 +1,51 @@
 import type { FC } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { BellOutlined } from '@ant-design/icons'
+import { BellOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
+import { Dropdown, App } from 'antd'
+import type { MenuProps } from 'antd'
+import { useDispatch, useSelector } from 'react-redux'
+import type { RootState } from '../store'
+import { useNavigate } from 'react-router-dom'
+import { logout } from '../services/features/auth/authSlice'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
 const InvestorHeader: FC = () => {
+    const dispatch = useDispatch()
+    const navigate = useNavigate()
+    const user = useSelector((state: RootState) => state.auth.user)
+    const { message } = App.useApp()
+
+    const handleLogout = () => {
+        message.success({ content: 'Đăng xuất thành công', key: 'logout', duration: 1.2 })
+        dispatch(logout())
+        setTimeout(() => {
+            navigate('/login')
+        }, 800)
+    }
+
+    const handleProfile = () => {
+        navigate('/investor/profile-investor')
+    }
+
+    const items: MenuProps['items'] = [
+        {
+            key: 'profile',
+            label: 'Profile',
+            icon: <UserOutlined style={{ fontSize: 14 }} />,
+            onClick: handleProfile
+        },
+        {
+            type: 'divider'
+        },
+        {
+            key: 'logout',
+            label: 'Logout',
+            icon: <LogoutOutlined style={{ fontSize: 14, color: '#ff4d4f' }} />,
+            onClick: handleLogout,
+            style: { color: '#ff4d4f' }
+        }
+    ]
+
     return (
         <header style={{ background: '#DBEAFE', borderBottom: '1px solid #e5e7eb' }}>
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
@@ -36,10 +78,19 @@ const InvestorHeader: FC = () => {
                     <div style={{ width: 36, height: 36, borderRadius: 18, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
                         <BellOutlined style={{ fontSize: 18, color: '#111' }} />
                     </div>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#34419A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                        AD
-                    </div>
-                    <span style={{ color: '#1f2937', fontWeight: 600 }}>Investor</span>
+
+                    <Dropdown menu={{ items }} trigger={['click']} placement="bottomRight">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 8 }}>
+                            {user?.profilePictureUrl ? (
+                                <img src={user.profilePictureUrl} alt="avatar" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#34419A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                                    {user?.fullName ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AD'}
+                                </div>
+                            )}
+                            <span style={{ color: '#1f2937', fontWeight: 600 }}>{user?.fullName || user?.email || 'Investor'}</span>
+                        </div>
+                    </Dropdown>
                 </div>
             </div>
         </header>

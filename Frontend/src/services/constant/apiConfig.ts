@@ -12,3 +12,9 @@ export const STARTUP_PROFILE_UPDATE_ENDPOINT = (accountId: string) =>
   `${BASE_URL}/startup/profile/${accountId}`;
 export const STARTUP_PROFILE_UPLOAD_ENDPOINT = (accountId: string) =>
   `${BASE_URL}/startup/profile/${accountId}/upload`;
+
+// Investor profile endpoints
+export const INVESTOR_PROFILE_GET_ENDPOINT = (accountId: string) =>
+  `${BASE_URL}/investor/profile/${accountId}`;
+export const INVESTOR_PROFILE_UPDATE_ENDPOINT = (accountId: string) =>
+  `${BASE_URL}/investor/profile/${accountId}`;

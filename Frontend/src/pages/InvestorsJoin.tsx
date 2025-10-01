@@ -4,8 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { DollarOutlined, ThunderboltOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg';
-import { useDispatch, useSelector } from 'react-redux';
-import type { TypedUseSelectorHook } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { registerInvestor } from '../services/features/auth/authSlice';
 
 type InputProps = { label: string; placeholder?: string; type?: string; rightIcon?: React.ReactNode; onRightIconClick?: () => void; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void; error?: string };
@@ -66,9 +65,7 @@ const InvestorsJoin: FC = () => {
     const [investmentFocus, setInvestmentFocus] = useState('');
     const [investmentRange, setInvestmentRange] = useState('');
     const [investmentExperience, setInvestmentExperience] = useState('');
-    // Define RootState for type safety
-    type RootState = { auth: { loading: boolean } };
-    const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+    // Define RootState for type safety (we'll just use useSelector directly where needed)
     const dispatch = useDispatch();
     // using local `submitting` to control submit state; global loading is not used here
     const navigate = useNavigate();
