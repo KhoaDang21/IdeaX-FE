@@ -12,6 +12,7 @@ export interface User {
   phoneNumber?: string;
   linkedInProfile?: string;
   companyWebsite?: string;
+  country?: string;
   profilePictureUrl?: string;
   companyLogo?: string;
   startupName?: string;
@@ -25,6 +26,7 @@ export interface User {
   investmentFocus?: string;
   investmentRange?: string;
   investmentExperience?: string;
+  twoFactorEnabled?: boolean;
 }
 
 export interface LoginCredentials {
@@ -78,6 +80,11 @@ export interface InvestorProfileResponse {
   investmentFocus?: string;
   investmentRange?: string;
   investmentExperience?: string;
+  // new fields returned by backend
+  country?: string;
+  phoneNumber?: string;
+  linkedInUrl?: string;
+  twoFactorEnabled?: boolean;
 }
 
 export interface LoginResponse {
