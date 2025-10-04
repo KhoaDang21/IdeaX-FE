@@ -46,7 +46,6 @@ const getInitialUser = (): User | null => {
     return null;
   }
 };
-
 const getInitialToken = (): string | null => {
   return localStorage.getItem("token");
 };
@@ -73,7 +72,12 @@ export const loginUser = createAsyncThunk<
   ) => {
     try {
       const response = await api.post(LOGIN_ENDPOINT, credentials);
-      return response.data;
+      const data = response.data;
+      // If backend returns a banned account, treat as failure
+      if (data?.account?.status === "BANNED") {
+        return rejectWithValue({ message: "Tài khoản của bạn đã bị khóa" });
+      }
+      return data;
     } catch (err: any) {
       const message =
         err.response?.data?.message || err.message || "Đăng nhập thất bại";
@@ -244,6 +248,19 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: LoginResponse }) => {
           state.loading = false;
           const backendAccount = action.payload.account;
+          // If backend returns a banned account (extra safety), do not accept login
+          if (backendAccount.status === "BANNED") {
+            state.isAuthenticated = false;
+            state.token = null;
+            state.user = null;
+            state.error = "Account is banned";
+            // ensure localStorage is cleared
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            // notify user via UI message immediately
+            message.error("Tài khoản của bạn đã bị khóa (Banned)");
+            return;
+          }
           const startupProfile = action.payload.startupProfile;
           const investorProfile = action.payload.investorProfile;
 

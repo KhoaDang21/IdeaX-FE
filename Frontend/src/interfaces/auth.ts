@@ -106,3 +106,30 @@ export interface AuthState {
   loading: boolean;
   error: string | null;
 }
+
+// Account DTOs / responses matching backend
+export type Role = "ADMIN" | "START_UP" | "INVESTOR";
+export type Status = "ACTIVE" | "INACTIVE" | "DELETED";
+
+export interface AccountResponse {
+  id: number | string;
+  email: string;
+  role: Role;
+  status: Status;
+  token?: string | null;
+  createdAt?: string;
+}
+
+export interface AccountCreateDTO {
+  email: string;
+  password: string;
+  role: Role;
+  status: Status;
+}
+
+export interface AccountUpdateDTO {
+  email?: string;
+  password?: string;
+  status?: Status;
+  role?: Role;
+}
