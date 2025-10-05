@@ -78,7 +78,7 @@ const SubmitNewProject: React.FC = () => {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Validation rules
+  // Validation rules - TẤT CẢ CÁC TRƯỜNG ĐỀU BẮT BUỘC
   const validateField = (name: FieldName, value: any, file?: File | null): string => {
     switch (name) {
       case 'projectName':
@@ -121,22 +121,29 @@ const SubmitNewProject: React.FC = () => {
         return '';
 
       case 'teamSize':
-        if (value) {
-          const teamSizeNum = parseInt(value);
-          if (isNaN(teamSizeNum) || teamSizeNum < 1 || teamSizeNum > 1000) {
-            return 'Team size must be between 1 and 1000';
-          }
+        if (!value) {
+          return 'Team size is required';
+        }
+        const teamSizeNum = parseInt(value);
+        if (isNaN(teamSizeNum) || teamSizeNum < 1 || teamSizeNum > 1000) {
+          return 'Team size must be between 1 and 1000';
         }
         return '';
 
       case 'location':
-        if (value && value.trim().length > 100) {
+        if (!value || value.trim().length === 0) {
+          return 'Location is required';
+        }
+        if (value.trim().length > 100) {
           return 'Location must be less than 100 characters';
         }
         return '';
 
       case 'website':
-        if (value && !isValidUrl(value)) {
+        if (!value || value.trim().length === 0) {
+          return 'Website is required';
+        }
+        if (!isValidUrl(value)) {
           return 'Please enter a valid URL (e.g., https://example.com)';
         }
         return '';
@@ -160,22 +167,22 @@ const SubmitNewProject: React.FC = () => {
         return validateFile(file, ['pdf'], 10 * 1024 * 1024); // 10MB
 
       case 'pitchVideo':
-        if (file) {
-          return validateFile(file, ['mp4', 'mov', 'avi'], 100 * 1024 * 1024); // 100MB
+        if (!file) {
+          return 'Pitch video is required';
         }
-        return '';
+        return validateFile(file, ['mp4', 'mov', 'avi'], 100 * 1024 * 1024); // 100MB
 
       case 'businessPlan':
-        if (file) {
-          return validateFile(file, ['pdf', 'doc', 'docx'], 10 * 1024 * 1024); // 10MB
+        if (!file) {
+          return 'Business plan is required';
         }
-        return '';
+        return validateFile(file, ['pdf', 'doc', 'docx'], 10 * 1024 * 1024); // 10MB
 
       case 'financialProjection':
-        if (file) {
-          return validateFile(file, ['pdf', 'xls', 'xlsx'], 10 * 1024 * 1024); // 10MB
+        if (!file) {
+          return 'Financial projection is required';
         }
-        return '';
+        return validateFile(file, ['pdf', 'xls', 'xlsx'], 10 * 1024 * 1024); // 10MB
 
       default:
         return '';
@@ -224,17 +231,9 @@ const SubmitNewProject: React.FC = () => {
     newErrors.website = validateField('website', website);
     newErrors.description = validateField('description', description);
     newErrors.pitchDeck = validateField('pitchDeck', '', pitchDeck);
-    
-    // Optional file validations
-    if (pitchVideo) {
-      newErrors.pitchVideo = validateField('pitchVideo', '', pitchVideo);
-    }
-    if (businessPlan) {
-      newErrors.businessPlan = validateField('businessPlan', '', businessPlan);
-    }
-    if (financialProjection) {
-      newErrors.financialProjection = validateField('financialProjection', '', financialProjection);
-    }
+    newErrors.pitchVideo = validateField('pitchVideo', '', pitchVideo);
+    newErrors.businessPlan = validateField('businessPlan', '', businessPlan);
+    newErrors.financialProjection = validateField('financialProjection', '', financialProjection);
 
     setErrors(newErrors);
     
@@ -274,7 +273,7 @@ const SubmitNewProject: React.FC = () => {
     } else {
       setErrors(prev => ({ 
         ...prev, 
-        [fieldName]: fieldName === 'pitchDeck' ? 'Pitch deck is required' : '' 
+        [fieldName]: `${fieldName} is required` 
       }));
       setFile(null);
     }
@@ -288,7 +287,8 @@ const SubmitNewProject: React.FC = () => {
     // Mark all fields as touched to show all errors
     const allFields: FieldName[] = [
       'projectName', 'category', 'customCategory', 'fundingStage', 
-      'fundingRange', 'teamSize', 'location', 'website', 'description', 'pitchDeck'
+      'fundingRange', 'teamSize', 'location', 'website', 'description', 
+      'pitchDeck', 'pitchVideo', 'businessPlan', 'financialProjection'
     ];
     
     const allTouched: Record<string, boolean> = {};
@@ -315,29 +315,17 @@ const SubmitNewProject: React.FC = () => {
     }
     submitData.append("fundingStage", fundingStage);
     submitData.append("fundingRange", fundingRange);
-    if (teamSize) {
-      submitData.append("teamSize", teamSize);
-    }
-    if (location) {
-      submitData.append("location", location.trim());
-    }
-    if (website) {
-      submitData.append("website", website.trim());
-    }
+    submitData.append("teamSize", teamSize);
+    submitData.append("location", location.trim());
+    submitData.append("website", website.trim());
     submitData.append("description", description.trim());
     submitData.append("status", status);
-    if (pitchDeck) {
-      submitData.append("pitchDeck", pitchDeck);
-    }
-    if (pitchVideo) {
-      submitData.append("pitchVideo", pitchVideo);
-    }
-    if (businessPlan) {
-      submitData.append("businessPlan", businessPlan);
-    }
-    if (financialProjection) {
-      submitData.append("financialProjection", financialProjection);
-    }
+    
+    // Tất cả file đều bắt buộc
+    if (pitchDeck) submitData.append("pitchDeck", pitchDeck);
+    if (pitchVideo) submitData.append("pitchVideo", pitchVideo);
+    if (businessPlan) submitData.append("businessPlan", businessPlan);
+    if (financialProjection) submitData.append("financialProjection", financialProjection);
 
     // Thêm token vào FormData để sử dụng trong thunk
     if (token) {
@@ -384,12 +372,6 @@ const SubmitNewProject: React.FC = () => {
         <h2 style={{ margin: 0, color: "#3b82f6" }}>Submit New Project</h2>
         <div>
           <button
-            onClick={() => handleCreate("DRAFT")}
-            style={{ marginRight: 8, padding: "6px 12px", background: "#eff6ff", border: "none", borderRadius: 6, cursor: "pointer" }}
-          >
-            Save Draft
-          </button>
-          <button
             onClick={() => handleCreate("PUBLISHED")}
             style={{ marginRight: 8, padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
           >
@@ -403,7 +385,7 @@ const SubmitNewProject: React.FC = () => {
           </button>
         </div>
       </div>
-      <p style={{ color: "#64748b", marginBottom: 24 }}>Create a compelling project profile to attract investors</p>
+      <p style={{ color: "#64748b", marginBottom: 24 }}>Create a compelling project profile to attract investors. All fields are required.</p>
 
       <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
         <h3 style={{ margin: "0 0 16px", color: "#3b82f6", display: "flex", alignItems: "center", gap: 8 }}>
@@ -581,7 +563,7 @@ const SubmitNewProject: React.FC = () => {
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, color: "#3b82f6" }}>
-                <UsergroupAddOutlined style={{ color: "#000" }} /> Team Size
+                <UsergroupAddOutlined style={{ color: "#000" }} /> Team Size *
               </label>
               <input
                 type="number"
@@ -614,7 +596,7 @@ const SubmitNewProject: React.FC = () => {
           <div style={{ display: "flex", gap: 16 }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, color: "#3b82f6" }}>
-                <GlobalOutlined style={{ color: "#000" }} /> Location
+                <GlobalOutlined style={{ color: "#000" }} /> Location *
               </label>
               <input
                 type="text"
@@ -641,7 +623,7 @@ const SubmitNewProject: React.FC = () => {
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, color: "#3b82f6" }}>
-                <GlobalOutlined style={{ color: "#000" }} /> Website
+                <GlobalOutlined style={{ color: "#000" }} /> Website *
               </label>
               <input
                 type="url"
@@ -712,6 +694,9 @@ const SubmitNewProject: React.FC = () => {
           <h3 style={{ margin: "24px 0 16px", color: "#3b82f6", display: "flex", alignItems: "center", gap: 8 }}>
             <UploadOutlined style={{ color: "#000" }} /> Documents & Media
           </h3>
+          <p style={{ color: "#64748b", marginBottom: 16, fontSize: 14 }}>
+            All documents are required for a complete project submission.
+          </p>
           <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(2, 1fr)", gridTemplateRows: "auto auto" }}>
             {/* Pitch Deck */}
             <div>
@@ -747,7 +732,7 @@ const SubmitNewProject: React.FC = () => {
 
             {/* Pitch Video */}
             <div>
-              <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Pitch Video (Optional)</label>
+              <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Pitch Video *</label>
               <label style={{ 
                 display: "block", 
                 padding: 8, 
@@ -779,7 +764,7 @@ const SubmitNewProject: React.FC = () => {
 
             {/* Business Plan */}
             <div>
-              <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Business Plan (Optional)</label>
+              <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Business Plan *</label>
               <label style={{ 
                 display: "block", 
                 padding: 8, 
@@ -811,7 +796,7 @@ const SubmitNewProject: React.FC = () => {
 
             {/* Financial Projection */}
             <div>
-              <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Financial Projection (Optional)</label>
+              <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Financial Projection *</label>
               <label style={{ 
                 display: "block", 
                 padding: 8, 
