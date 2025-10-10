@@ -7,12 +7,14 @@ import {
   MessageOutlined,
   UploadOutlined,
   PlusCircleOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
+import { Popconfirm, message } from "antd"; // Add message for notifications
 import type { RootState } from "../../store";
-import { getMyProjects, updateMilestone, getMilestonesByProject } from "../../services/features/project/projectSlice";
+import { getMyProjects, updateMilestone, getMilestonesByProject, deleteProject } from "../../services/features/project/projectSlice";
 import type { Project as ApiProject } from "../../interfaces/project";
 
-// Interface cho UI - giữ nguyên để không thay đổi UI
+// Interface cho UI
 interface Project {
   id: number;
   title: string;
@@ -44,6 +46,7 @@ const MyProjects: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
+  const [deletingProjectIds, setDeletingProjectIds] = useState<number[]>([]); // Track deleting projects
   
   // Lấy dữ liệu từ Redux store
   const { projects: apiProjects, milestones: apiMilestones, status, error } = useSelector((state: RootState) => state.project);
@@ -61,7 +64,7 @@ const MyProjects: React.FC = () => {
       return {
         id: project.id,
         title: project.projectName || "Untitled Project",
-        status: mapStatusToUI(project.status),
+        status: project.status || "Unknown",
         progress: calculateProgress(project),
         raised: formatCurrency(project.fundingAmount || 0),
         target: getTargetAmount(project),
@@ -95,16 +98,6 @@ const MyProjects: React.FC = () => {
   };
 
   // Hàm helper để transform dữ liệu
-  const mapStatusToUI = (status: string): string => {
-    const statusMap: { [key: string]: string } = {
-      'DRAFT': 'Waiting for Investor',
-      'PUBLISHED': 'Waiting for Investor',
-      'APPROVED': 'In Deal',
-      'REJECTED': 'Rejected'
-    };
-    return statusMap[status] || 'Waiting for Investor';
-  };
-
   const mapFundingStageToUI = (stage: string): string => {
     const stageMap: { [key: string]: string } = {
       'SEED': 'Initial Review',
@@ -116,25 +109,18 @@ const MyProjects: React.FC = () => {
   };
 
   const calculateProgress = (project: ApiProject): number => {
-    // Dựa vào status và funding stage để tính progress thực tế
-    const statusProgress: { [key: string]: number } = {
-      'DRAFT': 25,
-      'PUBLISHED': 50,
-      'APPROVED': 75,
-      'REJECTED': 0
+    const raisedAmount = project.fundingAmount || 0;
+    const rangeMap: { [key: string]: number } = {
+      'UNDER_100K': 100000,
+      '100K_500K': 500000,
+      '500K_1M': 1000000,
+      '1M_5M': 5000000,
+      'OVER_5M': 10000000
     };
-
-    const stageProgress: { [key: string]: number } = {
-      'SEED': 20,
-      'SERIES_A': 40,
-      'SERIES_B': 60,
-      'SERIES_C': 80
-    };
-
-    const baseProgress = statusProgress[project.status] || 0;
-    const stageBonus = stageProgress[project.fundingStage] || 0;
-    
-    return Math.min(baseProgress + (stageBonus / 4), 100);
+    const targetAmount = rangeMap[project.fundingRange] || 1000000;
+    if (targetAmount === 0) return 0;
+    const progress = (raisedAmount / targetAmount) * 100;
+    return Math.min(Math.round(progress), 100);
   };
 
   const formatCurrency = (amount: number): string => {
@@ -147,7 +133,6 @@ const MyProjects: React.FC = () => {
   };
 
   const getTargetAmount = (project: ApiProject): string => {
-    // Sử dụng fundingRange để xác định target amount thực tế
     const rangeMap: { [key: string]: string } = {
       'UNDER_100K': '$100K',
       '100K_500K': '$500K',
@@ -158,47 +143,58 @@ const MyProjects: React.FC = () => {
     return rangeMap[project.fundingRange] || '$1M';
   };
 
-  const generateTimeline = (project: ApiProject): Array<{stage: string; date: string; status: "completed" | "in-progress" | "upcoming"}> => {
-    const stages = ['Initial Review', 'Investor Meetings', 'Due Diligence', 'Term Sheet', 'Final Agreement'];
-    const currentStage = mapFundingStageToUI(project.fundingStage);
-    
-    // Sử dụng created date của project làm baseline
-    const baseDate = project.createdAt ? new Date(project.createdAt) : new Date();
-    
-    return stages.map((stage, index) => {
-      const date = new Date(baseDate);
-      date.setDate(date.getDate() + (index * 30)); // Mỗi stage cách nhau 30 ngày
-      
-      let status: "completed" | "in-progress" | "upcoming" = "upcoming";
-      const currentStageIndex = stages.indexOf(currentStage);
-      
-      if (index < currentStageIndex) {
-        status = "completed";
-      } else if (index === currentStageIndex) {
-        status = project.status === 'APPROVED' ? "completed" : "in-progress";
-      }
-      
-      return {
-        stage,
-        date: date.toISOString().split('T')[0],
-        status
-      };
-    });
-  };
+  const generateTimeline = (project: ApiProject): Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }> => {
+  const stages = ['Initial Review', 'Investor Meetings', 'Due Diligence', 'Term Sheet', 'Final Agreement'];
+  const currentStage = mapFundingStageToUI(project.fundingStage);
+  
+  // Lấy ngày tạo dự án, mặc định là ngày hiện tại nếu không có
+  const baseDate = project.createdAt ? new Date(project.createdAt) : new Date(); // 05/10/2025
+
+  return stages.map((stage, index) => {
+    let status: "completed" | "in-progress" | "upcoming" = "upcoming";
+    let date: string = "";
+
+    // Chỉ gán ngày cho giai đoạn đầu (Initial Review) nếu có createdAt
+    if (index === 0 && project.createdAt) {
+      date = baseDate.toISOString().split('T')[0]; // Chuyển thành chuỗi: "2025-10-05"
+    }
+
+    // Xác định trạng thái dựa trên currentStageIndex và project.status
+    const currentStageIndex = stages.indexOf(currentStage);
+    console.log(`Giai đoạn: ${stage}, index: ${index}, currentStageIndex: ${currentStageIndex}, trạng thái: ${project.status}, ngày: ${date}`); // Ghi log để debug
+
+    if (index < currentStageIndex) {
+      status = "completed";
+    } else if (index === currentStageIndex) {
+      status = project.status === 'APPROVED' ? "completed" : "in-progress";
+    } else if (index > currentStageIndex) {
+      status = "upcoming"; // Hiển thị là "Not started" trong UI
+    }
+
+    // Đảm bảo Initial Review là "in-progress" cho dự án mới (DRAFT/PUBLISHED)
+    if (index === 0 && project.status !== 'APPROVED' && date) {
+      status = "in-progress";
+    }
+
+    return {
+      stage,
+      date: (status === "completed" || status === "in-progress") ? date : "",
+      status
+    };
+  });
+};
 
   const calculateActiveInvestors = (project: ApiProject): number => {
-    // Dựa vào status và funding stage để ước tính số investors
     const investorMap: { [key: string]: number } = {
       'DRAFT': 0,
-      'PUBLISHED': Math.floor(Math.random() * 3) + 1, // 1-3 investors
-      'APPROVED': Math.floor(Math.random() * 5) + 3, // 3-7 investors
+      'PUBLISHED': Math.floor(Math.random() * 3) + 1,
+      'APPROVED': Math.floor(Math.random() * 5) + 3,
       'REJECTED': 0
     };
     return investorMap[project.status] || 0;
   };
 
   const calculateDaysLeft = (project: ApiProject): number => {
-    // Tính days left dựa trên created date và stage
     if (!project.createdAt) return 30;
     
     const createdDate = new Date(project.createdAt);
@@ -218,6 +214,8 @@ const MyProjects: React.FC = () => {
 
   // State cho projects hiển thị
   const [projects, setProjects] = useState<Project[]>([]);
+  // State cho errors hiển thị trong UI
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load projects khi component mount
   useEffect(() => {
@@ -245,6 +243,7 @@ const MyProjects: React.FC = () => {
       setProjects(transformedProjects);
     } else {
       setProjects([]);
+      setSelectedProject(null); // Reset selectedProject if no projects
     }
   }, [apiProjects, apiMilestones]);
 
@@ -257,7 +256,6 @@ const MyProjects: React.FC = () => {
     const milestone = selectedProjectData.milestones[index];
     
     try {
-      // Tìm milestone tương ứng trong API data
       const projectMilestones = apiMilestones?.filter((milestone: any) => 
         milestone.projectId === selectedProject
       ) || [];
@@ -265,7 +263,6 @@ const MyProjects: React.FC = () => {
       if (projectMilestones[index]) {
         const apiMilestone = projectMilestones[index];
         
-        // Update milestone status
         await dispatch(updateMilestone({
           id: apiMilestone.id,
           data: { 
@@ -273,10 +270,11 @@ const MyProjects: React.FC = () => {
           }
         }) as any);
         
-        // Refresh milestones data
         dispatch(getMilestonesByProject(selectedProject) as any);
+        message.success('Milestone updated successfully');
       }
     } catch (error) {
+      message.error('Failed to update milestone');
       console.error('Failed to update milestone:', error);
     }
   };
@@ -285,13 +283,31 @@ const MyProjects: React.FC = () => {
     navigate("/startup/new-project");
   };
 
+  const handleDeleteProject = async (projectId: number) => {
+    setDeletingProjectIds(prev => [...prev, projectId]); // Add to deleting state
+    setDeleteError(null); // Clear previous errors
+    try {
+      await dispatch(deleteProject(projectId) as any);
+      message.success('Project deleted successfully');
+      if (selectedProject === projectId) {
+        setSelectedProject(apiProjects.length > 1 ? apiProjects.find(p => p.id !== projectId)?.id || null : null);
+      }
+    } catch (error: any) {
+      setDeleteError(error.payload || 'Failed to delete project');
+      message.error(error.payload || 'Failed to delete project');
+    } finally {
+      setDeletingProjectIds(prev => prev.filter(id => id !== projectId)); // Remove from deleting state
+    }
+  };
+
   const selectedProjectData = projects.find(project => project.id === selectedProject);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "In Deal": return { background: "#dcfce7", color: "#16a34a" };
-      case "Waiting for Investor": return { background: "#fefce8", color: "#d97706" };
-      case "In Roommeet": return { background: "#ede9fe", color: "#7c3aed" };
+    switch (status.toUpperCase()) { // Normalize case for safety
+      case "APPROVED": return { background: "#dcfce7", color: "#16a34a" };
+      case "DRAFT":
+      case "PUBLISHED": return { background: "#fefce8", color: "#d97706" };
+      case "REJECTED": return { background: "#fee2e2", color: "#ef4444" };
       default: return { background: "#e5e7eb", color: "#6b7280" };
     }
   };
@@ -314,7 +330,6 @@ const MyProjects: React.FC = () => {
     }
   };
 
-  // Hiển thị loading state
   if (status === "loading" && projects.length === 0) {
     return (
       <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -323,7 +338,6 @@ const MyProjects: React.FC = () => {
     );
   }
 
-  // Hiển thị error state
   if (status === "failed" && projects.length === 0) {
     return (
       <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
@@ -334,7 +348,6 @@ const MyProjects: React.FC = () => {
     );
   }
 
-  // Hiển thị empty state
   if (projects.length === 0 && status === "succeeded") {
     return (
       <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
@@ -395,55 +408,86 @@ const MyProjects: React.FC = () => {
         </button>
       </div>
 
+      {/* Display deletion error if any */}
+      {deleteError && (
+        <div style={{ color: "red", textAlign: "center", marginBottom: 16 }}>
+          {deleteError}
+        </div>
+      )}
+
       {/* Top - Project Cards */}
-      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        {projects.map((project) => {
-          const statusStyle = getStatusColor(project.status);
-          return (
-            <div 
-              key={project.id}
-              onClick={() => setSelectedProject(project.id)}
-              style={{ 
-                flex: 1, 
-                minWidth: 250, 
-                background: "#fff", 
-                borderRadius: 12, 
-                padding: 16, 
-                boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-                border: selectedProject === project.id ? "2px solid #3b82f6" : "2px solid transparent",
-                cursor: "pointer",
-                transition: "all 0.2s ease"
-              }}
+<div style={{ 
+  display: "flex", 
+  gap: 16, 
+  marginBottom: 24, 
+  overflowX: "auto",
+  paddingBottom: 8
+}}>
+  {projects.map((project) => {
+    const statusStyle = getStatusColor(project.status);
+    const isDeleting = deletingProjectIds.includes(project.id);
+    return (
+      <div 
+        key={project.id}
+        onClick={() => !isDeleting && setSelectedProject(project.id)}
+        style={{ 
+          flex: "0 0 300px", // Fixed width, không co giãn
+          minWidth: 300, // Chiều rộng tối thiểu
+          background: "#fff", 
+          borderRadius: 12, 
+          padding: 16, 
+          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+          border: selectedProject === project.id ? "2px solid #3b82f6" : "2px solid transparent",
+          cursor: isDeleting ? "not-allowed" : "pointer",
+          opacity: isDeleting ? 0.6 : 1,
+          transition: "all 0.2s ease"
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 16 }}>{project.title}</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ 
+              fontSize: 12, 
+              background: statusStyle.background, 
+              color: statusStyle.color, 
+              padding: "2px 8px", 
+              borderRadius: 999 
+            }}>
+              {project.status}
+            </span>
+            <Popconfirm
+              title="Are you sure you want to delete this project?"
+              onConfirm={() => handleDeleteProject(project.id)}
+              okText="Yes"
+              cancelText="No"
+              disabled={isDeleting}
             >
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <h3 style={{ margin: 0, fontSize: 16 }}>{project.title}</h3>
-                <span style={{ 
-                  fontSize: 12, 
-                  background: statusStyle.background, 
-                  color: statusStyle.color, 
-                  padding: "2px 8px", 
-                  borderRadius: 999 
-                }}>
-                  {project.status}
-                </span>
-              </div>
-              <p style={{ margin: "8px 0", fontSize: 12, color: "#64748b" }}>Progress {project.progress}%</p>
-              <div style={{ height: 6, background: "#e5e7eb", borderRadius: 999 }}>
-                <div style={{ 
-                  width: `${project.progress}%`, 
-                  height: "100%", 
-                  background: "#3b82f6", 
-                  borderRadius: 999 
-                }} />
-              </div>
-              <p style={{ margin: "8px 0 0", fontSize: 14, fontWeight: 500 }}>
-                {project.raised} / {project.target}
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Stage: {project.stage}</p>
-            </div>
-          );
-        })}
+              <DeleteOutlined 
+                style={{ 
+                  color: isDeleting ? "#d1d5db" : "#ef4444", 
+                  cursor: isDeleting ? "not-allowed" : "pointer" 
+                }} 
+              />
+            </Popconfirm>
+          </div>
+        </div>
+        <p style={{ margin: "8px 0", fontSize: 12, color: "#64748b" }}>Progress {project.progress}%</p>
+        <div style={{ height: 6, background: "#e5e7eb", borderRadius: 999 }}>
+          <div style={{ 
+            width: `${project.progress}%`, 
+            height: "100%", 
+            background: "#3b82f6", 
+            borderRadius: 999 
+          }} />
+        </div>
+        <p style={{ margin: "8px 0 0", fontSize: 14, fontWeight: 500 }}>
+          {project.raised} / {project.target}
+        </p>
+        <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Stage: {project.stage}</p>
       </div>
+    );
+  })}
+</div>
 
       {selectedProjectData && (
         <>
@@ -468,7 +512,9 @@ const MyProjects: React.FC = () => {
                       ...getTimelineDotStyle(item.status)
                     }}></span>
                     <span style={getTimelineTextStyle(item.status)}>{item.stage}</span>
-                    <span style={{ float: "right", fontSize: 12 }}>{item.date}</span>
+                    <span style={{ float: "right", fontSize: 12 }}>
+                      {item.date || "Not started"}
+                    </span>
                     <br />
                     {item.status === "completed" && (
                       <span style={{ marginLeft: 0, color: "#16a34a", fontSize: 12, display: "block" }}>Completed</span>

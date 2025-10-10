@@ -28,7 +28,9 @@ export const createProject = createAsyncThunk<
     const token = getToken(getState);
     if (!token) return rejectWithValue("Authentication required.");
 
+    // Ensure default values if not provided
     if (!formData.has("status")) formData.append("status", "DRAFT");
+    if (!formData.has("fundingStage")) formData.append("fundingStage", "SEED");
 
     const response = await api.post("/projects", formData, {
       headers: { Authorization: `Bearer ${token}` },
