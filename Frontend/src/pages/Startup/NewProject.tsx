@@ -376,6 +376,12 @@ const SubmitNewProject: React.FC = () => {
             onClick={() => handleCreate("DRAFT")}
             style={{ marginRight: 8, padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
           >
+            Draft
+          </button>
+          <button
+            onClick={() => handleCreate("PUBLISHED")}
+            style={{ marginRight: 8, padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+          >
             Submit
           </button>
           <button
