@@ -372,12 +372,12 @@ const SubmitNewProject: React.FC = () => {
         <h2 style={{ margin: 0, color: "#3b82f6" }}>Submit New Project</h2>
         <div>
           {/* Publish explicitly if user wants to publish immediately */}
-          <button
+          {/* <button
             onClick={() => handleCreate("DRAFT")}
             style={{ marginRight: 8, padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
           >
             Draft
-          </button>
+          </button> */}
           <button
             onClick={() => handleCreate("PUBLISHED")}
             style={{ marginRight: 8, padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
