@@ -1,10 +1,11 @@
+// src/services/features/project/projectSlice.ts
 import { createSlice, createAsyncThunk, isPending, isRejected, type UnknownAction } from "@reduxjs/toolkit";
 import { api } from "../../constant/axiosInstance";
 import type { RootState } from "../../../store";
 import type { Project } from "../../../interfaces/project";
 import type { Milestone } from "../../../interfaces/milestone";
 
-/* ------------------ 🔑 Helper lấy token ------------------ */
+// Helper to get token
 const getToken = (getState: any) => {
   const state = getState();
   const token = state.auth?.token;
@@ -16,9 +17,27 @@ const getToken = (getState: any) => {
   );
 };
 
+// Define the state interface
+interface ProjectState {
+  projects: Project[];
+  milestones: Milestone[];
+  project: Project | null; // Add field for single project
+  status: "idle" | "loading" | "succeeded" | "failed";
+  error: string | null;
+}
+
+// Initial state
+const initialState: ProjectState = {
+  projects: [],
+  milestones: [],
+  project: null, // Initialize as null
+  status: "idle",
+  error: null,
+};
+
 /* ------------------ PROJECT CONTROLLER ------------------ */
 
-// POST /projects
+// POST /projects (unchanged)
 export const createProject = createAsyncThunk<
   Project,
   FormData,
@@ -28,7 +47,6 @@ export const createProject = createAsyncThunk<
     const token = getToken(getState);
     if (!token) return rejectWithValue("Authentication required.");
 
-    // Ensure default values if not provided
     if (!formData.has("status")) formData.append("status", "DRAFT");
     if (!formData.has("fundingStage")) formData.append("fundingStage", "SEED");
 
@@ -42,20 +60,23 @@ export const createProject = createAsyncThunk<
 });
 
 // GET /projects/{id}
-export const getProjectById = createAsyncThunk<Project, number, { rejectValue: string; state: RootState }>(
-  "projects/getById",
-  async (id, { rejectWithValue, getState }) => {
-    try {
-      const token = getToken(getState);
-      const res = await api.get(`/projects/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.data;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to get project");
-    }
+export const getProjectById = createAsyncThunk<
+  Project,
+  number,
+  { rejectValue: string; state: RootState }
+>("projects/getById", async (id, { rejectWithValue, getState }) => {
+  try {
+    const token = getToken(getState);
+    const res = await api.get(`/projects/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data?.message || "Failed to get project");
   }
-);
+});
 
-// PUT /projects/{id}
+// PUT /projects/{id} (unchanged)
 export const updateProject = createAsyncThunk<
   Project,
   { id: number; data: Partial<Project> },
@@ -72,21 +93,24 @@ export const updateProject = createAsyncThunk<
   }
 });
 
-// DELETE /projects/{id}
-export const deleteProject = createAsyncThunk<number, number, { rejectValue: string; state: RootState }>(
-  "projects/delete",
-  async (id, { rejectWithValue, getState }) => {
-    try {
-      const token = getToken(getState);
-      await api.delete(`/projects/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      return id;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to delete project");
-    }
+// DELETE /projects/{id} (unchanged)
+export const deleteProject = createAsyncThunk<
+  number,
+  number,
+  { rejectValue: string; state: RootState }
+>("projects/delete", async (id, { rejectWithValue, getState }) => {
+  try {
+    const token = getToken(getState);
+    await api.delete(`/projects/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return id;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data?.message || "Failed to delete project");
   }
-);
+});
 
-// PUT /projects/{id}/approve
+// PUT /projects/{id}/approve (unchanged)
 export const approveProject = createAsyncThunk<
   Project,
   number,
@@ -94,14 +118,16 @@ export const approveProject = createAsyncThunk<
 >("projects/approve", async (id, { rejectWithValue, getState }) => {
   try {
     const token = getToken(getState);
-    const res = await api.put(`/projects/${id}/approve`, {}, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await api.put(`/projects/${id}/approve`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return res.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to approve project");
   }
 });
 
-// PUT /projects/{id}/reject
+// PUT /projects/{id}/reject (unchanged)
 export const rejectProject = createAsyncThunk<
   Project,
   number,
@@ -109,14 +135,16 @@ export const rejectProject = createAsyncThunk<
 >("projects/reject", async (id, { rejectWithValue, getState }) => {
   try {
     const token = getToken(getState);
-    const res = await api.put(`/projects/${id}/reject`, {}, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await api.put(`/projects/${id}/reject`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return res.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to reject project");
   }
 });
 
-// GET /projects/my
+// GET /projects/my (unchanged)
 export const getMyProjects = createAsyncThunk<
   Project[],
   void,
@@ -124,7 +152,9 @@ export const getMyProjects = createAsyncThunk<
 >("projects/getMy", async (_, { rejectWithValue, getState }) => {
   try {
     const token = getToken(getState);
-    const res = await api.get("/projects/my", { headers: { Authorization: `Bearer ${token}` } });
+    const res = await api.get("/projects/my", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return res.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to get my projects");
@@ -133,23 +163,24 @@ export const getMyProjects = createAsyncThunk<
 
 /* ------------------ MILESTONE CONTROLLER ------------------ */
 
-// GET /api/milestones/{id}
-export const getMilestoneById = createAsyncThunk<Milestone, number, { rejectValue: string; state: RootState }>(
-  "milestones/getById",
-  async (id, { rejectWithValue, getState }) => {
-    try {
-      const token = getToken(getState);
-      const res = await api.get(`/api/milestones/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return res.data;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to get milestone");
-    }
+// GET /api/milestones/{id} (unchanged)
+export const getMilestoneById = createAsyncThunk<
+  Milestone,
+  number,
+  { rejectValue: string; state: RootState }
+>("milestones/getById", async (id, { rejectWithValue, getState }) => {
+  try {
+    const token = getToken(getState);
+    const res = await api.get(`/api/milestones/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data?.message || "Failed to get milestone");
   }
-);
+});
 
-// PUT /api/milestones/{id}
+// PUT /api/milestones/{id} (unchanged)
 export const updateMilestone = createAsyncThunk<
   Milestone,
   { id: number; data: Partial<Milestone> },
@@ -166,23 +197,24 @@ export const updateMilestone = createAsyncThunk<
   }
 });
 
-// DELETE /api/milestones/{id}
-export const deleteMilestone = createAsyncThunk<number, number, { rejectValue: string; state: RootState }>(
-  "milestones/delete",
-  async (id, { rejectWithValue, getState }) => {
-    try {
-      const token = getToken(getState);
-      await api.delete(`/api/milestones/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return id;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to delete milestone");
-    }
+// DELETE /api/milestones/{id} (unchanged)
+export const deleteMilestone = createAsyncThunk<
+  number,
+  number,
+  { rejectValue: string; state: RootState }
+>("milestones/delete", async (id, { rejectWithValue, getState }) => {
+  try {
+    const token = getToken(getState);
+    await api.delete(`/api/milestones/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return id;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data?.message || "Failed to delete milestone");
   }
-);
+});
 
-// GET /api/milestones/project/{projectId}
+// GET /api/milestones/project/{projectId} (unchanged)
 export const getMilestonesByProject = createAsyncThunk<
   Milestone[],
   number,
@@ -199,7 +231,7 @@ export const getMilestonesByProject = createAsyncThunk<
   }
 });
 
-// POST /api/milestones/project/{projectId}
+// POST /api/milestones/project/{projectId} (unchanged)
 export const createMilestone = createAsyncThunk<
   Milestone,
   { projectId: number; data: Omit<Milestone, "id" | "createdAt" | "updatedAt"> },
@@ -216,7 +248,7 @@ export const createMilestone = createAsyncThunk<
   }
 });
 
-// Định nghĩa kiểu cho rejected action với UnknownAction
+// Define type for rejected action
 interface RejectedAction extends UnknownAction {
   payload?: string;
   error?: { message: string };
@@ -225,18 +257,16 @@ interface RejectedAction extends UnknownAction {
 /* ------------------ SLICE ------------------ */
 const projectSlice = createSlice({
   name: "projects",
-  initialState: {
-    projects: [] as Project[],
-    milestones: [] as Milestone[],
-    status: "idle",
-    error: null as string | null,
-  },
+  initialState,
   reducers: {
     clearError: (state) => {
       state.error = null;
     },
     resetStatus: (state) => {
       state.status = "idle";
+    },
+    clearProject: (state) => {
+      state.project = null; // Clear single project
     },
   },
   extraReducers: (builder) => {
@@ -250,12 +280,36 @@ const projectSlice = createSlice({
         state.projects = action.payload;
         state.status = "succeeded";
       })
+      .addCase(getProjectById.fulfilled, (state, action) => {
+        state.project = action.payload; // Store single project
+        state.status = "succeeded";
+      })
       .addCase(updateProject.fulfilled, (state, action) => {
         const i = state.projects.findIndex((p) => p.id === action.payload.id);
         if (i !== -1) state.projects[i] = action.payload;
+        if (state.project && state.project.id === action.payload.id) {
+          state.project = action.payload; // Update single project if it matches
+        }
       })
       .addCase(deleteProject.fulfilled, (state, action) => {
         state.projects = state.projects.filter((p) => p.id !== action.payload);
+        if (state.project && state.project.id === action.payload) {
+          state.project = null; // Clear single project if deleted
+        }
+      })
+      .addCase(approveProject.fulfilled, (state, action) => {
+        const i = state.projects.findIndex((p) => p.id === action.payload.id);
+        if (i !== -1) state.projects[i] = action.payload;
+        if (state.project && state.project.id === action.payload.id) {
+          state.project = action.payload;
+        }
+      })
+      .addCase(rejectProject.fulfilled, (state, action) => {
+        const i = state.projects.findIndex((p) => p.id === action.payload.id);
+        if (i !== -1) state.projects[i] = action.payload;
+        if (state.project && state.project.id === action.payload.id) {
+          state.project = action.payload;
+        }
       })
       /* MILESTONES CRUD */
       .addCase(getMilestonesByProject.fulfilled, (state, action) => {
@@ -278,12 +332,11 @@ const projectSlice = createSlice({
       })
       .addMatcher(isRejected, (state, action) => {
         state.status = "failed";
-        // Type assertion với UnknownAction
         const rejectedAction = action as RejectedAction;
         state.error = rejectedAction.payload || rejectedAction.error?.message || "Something went wrong";
       });
   },
 });
 
-export const { clearError, resetStatus } = projectSlice.actions;
+export const { clearError, resetStatus, clearProject } = projectSlice.actions;
 export default projectSlice.reducer;

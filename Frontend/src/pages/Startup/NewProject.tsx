@@ -1,4 +1,4 @@
-// src/pages/Startup/NewProject.tsx
+// src/pages/Startup/SubmitNewProject.tsx
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -17,8 +17,10 @@ import {
 } from "@ant-design/icons";
 import { createProject } from "../../services/features/project/projectSlice";
 import { type AppDispatch, type RootState } from "../../store";
+import { App } from "antd";
+import type { ProjectFormState } from "../../interfaces/project";
 
-// Interface for validation errors với index signature
+// Interface for validation errors
 interface ValidationErrors {
   [key: string]: string | undefined;
   projectName?: string;
@@ -36,153 +38,116 @@ interface ValidationErrors {
   financialProjection?: string;
 }
 
-// Type cho field names
-type FieldName = 
-  | 'projectName' 
-  | 'category' 
-  | 'customCategory' 
-  | 'fundingStage' 
-  | 'fundingRange' 
-  | 'teamSize' 
-  | 'location' 
-  | 'website' 
-  | 'description' 
-  | 'pitchDeck' 
-  | 'pitchVideo' 
-  | 'businessPlan' 
+// Type for field names
+type FieldName =
+  | 'projectName'
+  | 'category'
+  | 'customCategory'
+  | 'fundingStage'
+  | 'fundingRange'
+  | 'teamSize'
+  | 'location'
+  | 'website'
+  | 'description'
+  | 'pitchDeck'
+  | 'pitchVideo'
+  | 'businessPlan'
   | 'financialProjection';
 
 const SubmitNewProject: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  
-  // Lấy token từ Redux store
+  const { message } = App.useApp();
   const token = useSelector((state: RootState) => state.auth?.token);
-  
-  // Form states
-  const [projectName, setProjectName] = useState("");
-  const [category, setCategory] = useState("");
-  const [customCategory, setCustomCategory] = useState("");
-  const [fundingStage, setFundingStage] = useState("");
-  const [fundingRange, setFundingRange] = useState("");
-  const [teamSize, setTeamSize] = useState("");
-  const [location, setLocation] = useState("");
-  const [website, setWebsite] = useState("");
-  const [description, setDescription] = useState("");
-  const [pitchDeck, setPitchDeck] = useState<File | null>(null);
-  const [pitchVideo, setPitchVideo] = useState<File | null>(null);
-  const [businessPlan, setBusinessPlan] = useState<File | null>(null);
-  const [financialProjection, setFinancialProjection] = useState<File | null>(null);
-  
+
+  // Form state using ProjectFormState
+  const [formData, setFormData] = useState<ProjectFormState>({
+    projectName: "",
+    category: "",
+    customCategory: "",
+    fundingStage: "",
+    fundingRange: "",
+    teamSize: "",
+    location: "",
+    website: "",
+    description: "",
+    pitchDeck: null,
+    pitchVideo: null,
+    businessPlan: null,
+    financialProjection: null,
+  });
+
   // Validation states
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  // Validation rules - TẤT CẢ CÁC TRƯỜNG ĐỀU BẮT BUỘC
+  // Validation rules
   const validateField = (name: FieldName, value: any, file?: File | null): string => {
     switch (name) {
       case 'projectName':
-        if (!value || value.trim().length === 0) {
-          return 'Project name is required';
-        }
-        if (value.trim().length < 3) {
-          return 'Project name must be at least 3 characters long';
-        }
-        if (value.trim().length > 100) {
-          return 'Project name must be less than 100 characters';
-        }
+        if (!value || value.trim().length === 0) return 'Project name is required';
+        if (value.trim().length < 3) return 'Project name must be at least 3 characters long';
+        if (value.trim().length > 100) return 'Project name must be less than 100 characters';
         return '';
 
       case 'category':
-        if (!value) {
-          return 'Category is required';
-        }
+        if (!value) return 'Category is required';
         return '';
 
       case 'customCategory':
-        if (category === 'OTHER' && (!value || value.trim().length === 0)) {
+        if (formData.category === 'OTHER' && (!value || value.trim().length === 0))
           return 'Custom category is required when selecting "Other"';
-        }
-        if (category === 'OTHER' && value.trim().length > 50) {
+        if (formData.category === 'OTHER' && value.trim().length > 50)
           return 'Custom category must be less than 50 characters';
-        }
         return '';
 
       case 'fundingStage':
-        if (!value) {
-          return 'Funding stage is required';
-        }
+        if (!value) return 'Funding stage is required';
         return '';
 
       case 'fundingRange':
-        if (!value) {
-          return 'Funding range is required';
-        }
+        if (!value) return 'Funding range is required';
         return '';
 
       case 'teamSize':
-        if (!value) {
-          return 'Team size is required';
-        }
+        if (!value) return 'Team size is required';
         const teamSizeNum = parseInt(value);
-        if (isNaN(teamSizeNum) || teamSizeNum < 1 || teamSizeNum > 1000) {
+        if (isNaN(teamSizeNum) || teamSizeNum < 1 || teamSizeNum > 1000)
           return 'Team size must be between 1 and 1000';
-        }
         return '';
 
       case 'location':
-        if (!value || value.trim().length === 0) {
-          return 'Location is required';
-        }
-        if (value.trim().length > 100) {
-          return 'Location must be less than 100 characters';
-        }
+        if (!value || value.trim().length === 0) return 'Location is required';
+        if (value.trim().length > 100) return 'Location must be less than 100 characters';
         return '';
 
       case 'website':
-        if (!value || value.trim().length === 0) {
-          return 'Website is required';
-        }
-        if (!isValidUrl(value)) {
-          return 'Please enter a valid URL (e.g., https://example.com)';
-        }
+        if (!value || value.trim().length === 0) return 'Website is required';
+        if (!isValidUrl(value)) return 'Please enter a valid URL (e.g., https://example.com)';
         return '';
 
       case 'description':
-        if (!value || value.trim().length === 0) {
-          return 'Description is required';
-        }
-        if (value.trim().length < 50) {
-          return 'Description must be at least 50 characters long';
-        }
-        if (value.trim().length > 2000) {
-          return 'Description must be less than 2000 characters';
-        }
+        if (!value || value.trim().length === 0) return 'Description is required';
+        if (value.trim().length < 50) return 'Description must be at least 50 characters long';
+        if (value.trim().length > 2000) return 'Description must be less than 2000 characters';
         return '';
 
       case 'pitchDeck':
-        if (!file) {
-          return 'Pitch deck is required';
-        }
-        return validateFile(file, ['pdf'], 10 * 1024 * 1024); // 10MB
+        if (!file) return 'Pitch deck is required';
+        return validateFile(file, ['pdf'], 10 * 1024 * 1024);
 
       case 'pitchVideo':
-        if (!file) {
-          return 'Pitch video is required';
-        }
-        return validateFile(file, ['mp4', 'mov', 'avi'], 100 * 1024 * 1024); // 100MB
+        if (!file) return 'Pitch video is required';
+        return validateFile(file, ['mp4', 'mov', 'avi'], 100 * 1024 * 1024);
 
       case 'businessPlan':
-        if (!file) {
-          return 'Business plan is required';
-        }
-        return validateFile(file, ['pdf', 'doc', 'docx'], 10 * 1024 * 1024); // 10MB
+        if (!file) return 'Business plan is required';
+        return validateFile(file, ['pdf', 'doc', 'docx'], 10 * 1024 * 1024);
 
       case 'financialProjection':
-        if (!file) {
-          return 'Financial projection is required';
-        }
-        return validateFile(file, ['pdf', 'xls', 'xlsx'], 10 * 1024 * 1024); // 10MB
+        if (!file) return 'Financial projection is required';
+        return validateFile(file, ['pdf', 'xls', 'xlsx'], 10 * 1024 * 1024);
 
       default:
         return '';
@@ -192,16 +157,12 @@ const SubmitNewProject: React.FC = () => {
   // File validation helper
   const validateFile = (file: File, allowedTypes: string[], maxSize: number): string => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    
-    if (!fileExtension || !allowedTypes.includes(fileExtension)) {
+    if (!fileExtension || !allowedTypes.includes(fileExtension))
       return `File type not allowed. Allowed types: ${allowedTypes.join(', ')}`;
-    }
-    
     if (file.size > maxSize) {
       const maxSizeMB = maxSize / (1024 * 1024);
       return `File size too large. Maximum size: ${maxSizeMB}MB`;
     }
-    
     return '';
   };
 
@@ -217,143 +178,98 @@ const SubmitNewProject: React.FC = () => {
 
   // Validate entire form
   const validateForm = (): boolean => {
-    console.log("🔍 Validating form...");
-    
-    const newErrors: ValidationErrors = {};
-    
-    newErrors.projectName = validateField('projectName', projectName);
-    newErrors.category = validateField('category', category);
-    newErrors.customCategory = validateField('customCategory', customCategory);
-    newErrors.fundingStage = validateField('fundingStage', fundingStage);
-    newErrors.fundingRange = validateField('fundingRange', fundingRange);
-    newErrors.teamSize = validateField('teamSize', teamSize);
-    newErrors.location = validateField('location', location);
-    newErrors.website = validateField('website', website);
-    newErrors.description = validateField('description', description);
-    newErrors.pitchDeck = validateField('pitchDeck', '', pitchDeck);
-    newErrors.pitchVideo = validateField('pitchVideo', '', pitchVideo);
-    newErrors.businessPlan = validateField('businessPlan', '', businessPlan);
-    newErrors.financialProjection = validateField('financialProjection', '', financialProjection);
+    const newErrors: ValidationErrors = {
+      projectName: validateField('projectName', formData.projectName),
+      category: validateField('category', formData.category),
+      customCategory: validateField('customCategory', formData.customCategory),
+      fundingStage: validateField('fundingStage', formData.fundingStage),
+      fundingRange: validateField('fundingRange', formData.fundingRange),
+      teamSize: validateField('teamSize', formData.teamSize),
+      location: validateField('location', formData.location),
+      website: validateField('website', formData.website),
+      description: validateField('description', formData.description),
+      pitchDeck: validateField('pitchDeck', '', formData.pitchDeck),
+      pitchVideo: validateField('pitchVideo', '', formData.pitchVideo),
+      businessPlan: validateField('businessPlan', '', formData.businessPlan),
+      financialProjection: validateField('financialProjection', '', formData.financialProjection),
+    };
 
     setErrors(newErrors);
-    
-    const isValid = !Object.values(newErrors).some(error => error !== '');
-    console.log("📋 Validation result:", isValid ? "VALID" : "INVALID", newErrors);
-    
-    return isValid;
+    return !Object.values(newErrors).some((error) => error !== '');
   };
 
   // Handle field blur
   const handleBlur = (fieldName: string) => {
-    setTouched(prev => ({ ...prev, [fieldName]: true }));
+    setTouched((prev) => ({ ...prev, [fieldName]: true }));
   };
 
-  // Handle file upload with validation
+  // Handle file upload
   const handleFileUpload = (
-    event: React.ChangeEvent<HTMLInputElement>, 
-    setFile: (file: File | null) => void, 
+    event: React.ChangeEvent<HTMLInputElement>,
+    setFile: (file: File | null) => void,
     fieldName: FieldName
   ) => {
     if (event.target.files && event.target.files.length > 0) {
       const file = event.target.files[0];
-      console.log(`📁 File selected for ${fieldName}:`, file.name, `(${file.size} bytes)`);
-      
       const error = validateField(fieldName, '', file);
-      
       if (error) {
-        console.log(`❌ File validation error for ${fieldName}:`, error);
-        setErrors(prev => ({ ...prev, [fieldName]: error }));
-        event.target.value = ''; // Reset file input
+        setErrors((prev) => ({ ...prev, [fieldName]: error }));
+        event.target.value = '';
         setFile(null);
       } else {
-        setErrors(prev => ({ ...prev, [fieldName]: '' }));
+        setErrors((prev) => ({ ...prev, [fieldName]: '' }));
         setFile(file);
-        console.log(`✅ File validated successfully for ${fieldName}`);
       }
     } else {
-      setErrors(prev => ({ 
-        ...prev, 
-        [fieldName]: `${fieldName} is required` 
-      }));
+      setErrors((prev) => ({ ...prev, [fieldName]: `${fieldName} is required` }));
       setFile(null);
     }
   };
 
   // Handle form submission
   const handleCreate = (status: string) => {
-    console.log("🎯 handleCreate called with status:", status);
-    console.log("🔐 Current token:", token);
-
-    // Mark all fields as touched to show all errors
     const allFields: FieldName[] = [
-      'projectName', 'category', 'customCategory', 'fundingStage', 
-      'fundingRange', 'teamSize', 'location', 'website', 'description', 
+      'projectName', 'category', 'customCategory', 'fundingStage',
+      'fundingRange', 'teamSize', 'location', 'website', 'description',
       'pitchDeck', 'pitchVideo', 'businessPlan', 'financialProjection'
     ];
-    
-    const allTouched: Record<string, boolean> = {};
-    allFields.forEach(field => {
-      allTouched[field] = true;
-    });
-    
-    setTouched(allTouched);
+    setTouched(allFields.reduce((acc, field) => ({ ...acc, [field]: true }), {}));
 
     if (!validateForm()) {
-      console.log("❌ Form validation failed", errors);
-      alert("Please fix the validation errors before submitting.");
+      message.error("Please fix the validation errors before submitting.");
       return;
     }
 
-    console.log("✅ Form validation passed");
-
-    // Tạo FormData object
     const submitData = new FormData();
-    submitData.append("projectName", projectName.trim());
-    submitData.append("category", category);
-    if (customCategory) {
-      submitData.append("customCategory", customCategory.trim());
-    }
-    submitData.append("fundingStage", fundingStage);
-    submitData.append("fundingRange", fundingRange);
-    submitData.append("teamSize", teamSize);
-    submitData.append("location", location.trim());
-    submitData.append("website", website.trim());
-    submitData.append("description", description.trim());
+    submitData.append("projectName", formData.projectName.trim());
+    submitData.append("category", formData.category);
+    if (formData.customCategory) submitData.append("customCategory", formData.customCategory.trim());
+    submitData.append("fundingStage", formData.fundingStage);
+    submitData.append("fundingRange", formData.fundingRange);
+    submitData.append("teamSize", formData.teamSize);
+    submitData.append("location", formData.location.trim());
+    submitData.append("website", formData.website!.trim());
+    submitData.append("description", formData.description.trim());
     submitData.append("status", status);
-    
-    // Tất cả file đều bắt buộc
-    if (pitchDeck) submitData.append("pitchDeck", pitchDeck);
-    if (pitchVideo) submitData.append("pitchVideo", pitchVideo);
-    if (businessPlan) submitData.append("businessPlan", businessPlan);
-    if (financialProjection) submitData.append("financialProjection", financialProjection);
+    if (formData.pitchDeck) submitData.append("pitchDeck", formData.pitchDeck);
+    if (formData.pitchVideo) submitData.append("pitchVideo", formData.pitchVideo);
+    if (formData.businessPlan) submitData.append("businessPlan", formData.businessPlan);
+    if (formData.financialProjection) submitData.append("financialProjection", formData.financialProjection);
 
-    // Thêm token vào FormData để sử dụng trong thunk
-    if (token) {
-      submitData.append("token", token);
-    }
+    setSubmitting(true);
+    message.loading({ content: 'Creating project...', key: 'createProject', duration: 0 });
 
-    // Debug: log form data
-    console.log("📤 Submitting form data:");
-    for (let [key, value] of submitData.entries()) {
-      if (value instanceof File) {
-        console.log(`  ${key}:`, value.name, `(${value.size} bytes)`);
-      } else {
-        console.log(`  ${key}:`, value);
-      }
-    }
-
-    console.log("🚀 Dispatching createProject...");
-    
     dispatch(createProject(submitData))
       .unwrap()
       .then((result) => {
-        console.log("✅ Project created successfully:", result);
-        alert("Project created successfully!");
+        message.success({ content: 'Project created successfully!', key: 'createProject' });
         navigate("/startup/my-projects");
       })
       .catch((error: string) => {
-        console.error("❌ Error creating project:", error);
-        alert(`Failed to create project: ${error}`);
+        message.error({ content: `Failed to create project: ${error}`, key: 'createProject' });
+      })
+      .finally(() => {
+        setSubmitting(false);
       });
   };
 
@@ -371,22 +287,31 @@ const SubmitNewProject: React.FC = () => {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h2 style={{ margin: 0, color: "#3b82f6" }}>Submit New Project</h2>
         <div>
-          {/* Publish explicitly if user wants to publish immediately */}
-          {/* <button
-            onClick={() => handleCreate("DRAFT")}
-            style={{ marginRight: 8, padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
-          >
-            Draft
-          </button> */}
           <button
-            onClick={() => handleCreate("PUBLISHED")}
-            style={{ marginRight: 8, padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+            onClick={() => handleCreate("DRAFT")}
+            disabled={submitting}
+            style={{
+              marginRight: 8,
+              padding: "6px 12px",
+              background: submitting ? "#94a3b8" : "#3b82f6",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              cursor: submitting ? "not-allowed" : "pointer",
+            }}
           >
-            Submit
+            {submitting ? 'Creating...' : 'Submit'}
           </button>
           <button
             onClick={handleBackToProjects}
-            style={{ padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+            style={{
+              padding: "6px 12px",
+              background: "#3b82f6",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
           >
             Back to Projects
           </button>
@@ -406,18 +331,18 @@ const SubmitNewProject: React.FC = () => {
             </label>
             <input
               type="text"
-              value={projectName}
+              value={formData.projectName}
               onChange={(e) => {
-                setProjectName(e.target.value);
-                setErrors(prev => ({ ...prev, projectName: validateField('projectName', e.target.value) }));
+                setFormData((prev) => ({ ...prev, projectName: e.target.value }));
+                setErrors((prev) => ({ ...prev, projectName: validateField('projectName', e.target.value) }));
               }}
               onBlur={() => handleBlur('projectName')}
               placeholder="Enter your project name"
-              style={{ 
-                width: "100%", 
-                padding: 8, 
-                border: `1px solid ${shouldShowError('projectName') ? '#ef4444' : '#d1d5db'}`, 
-                borderRadius: 6 
+              style={{
+                width: "100%",
+                padding: 8,
+                border: `1px solid ${shouldShowError('projectName') ? '#ef4444' : '#d1d5db'}`,
+                borderRadius: 6,
               }}
             />
             {shouldShowError('projectName') && (
@@ -435,18 +360,18 @@ const SubmitNewProject: React.FC = () => {
                 <UsergroupAddOutlined style={{ color: "#000" }} /> Category *
               </label>
               <select
-                value={category}
+                value={formData.category}
                 onChange={(e) => {
-                  setCategory(e.target.value);
-                  setErrors(prev => ({ ...prev, category: validateField('category', e.target.value) }));
+                  setFormData((prev) => ({ ...prev, category: e.target.value }));
+                  setErrors((prev) => ({ ...prev, category: validateField('category', e.target.value) }));
                 }}
                 onBlur={() => handleBlur('category')}
-                style={{ 
-                  width: "100%", 
-                  padding: 8, 
-                  border: `1px solid ${shouldShowError('category') ? '#ef4444' : '#d1d5db'}`, 
-                  borderRadius: 6, 
-                  background: "#f3f4f6" 
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: `1px solid ${shouldShowError('category') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
+                  background: "#f3f4f6",
                 }}
               >
                 <option value="">Select category</option>
@@ -472,18 +397,18 @@ const SubmitNewProject: React.FC = () => {
                 <DollarCircleOutlined style={{ color: "#000" }} /> Funding Stage *
               </label>
               <select
-                value={fundingStage}
+                value={formData.fundingStage}
                 onChange={(e) => {
-                  setFundingStage(e.target.value);
-                  setErrors(prev => ({ ...prev, fundingStage: validateField('fundingStage', e.target.value) }));
+                  setFormData((prev) => ({ ...prev, fundingStage: e.target.value }));
+                  setErrors((prev) => ({ ...prev, fundingStage: validateField('fundingStage', e.target.value) }));
                 }}
                 onBlur={() => handleBlur('fundingStage')}
-                style={{ 
-                  width: "100%", 
-                  padding: 8, 
-                  border: `1px solid ${shouldShowError('fundingStage') ? '#ef4444' : '#d1d5db'}`, 
-                  borderRadius: 6, 
-                  background: "#f3f4f6" 
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: `1px solid ${shouldShowError('fundingStage') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
+                  background: "#f3f4f6",
                 }}
               >
                 <option value="">Select stage</option>
@@ -504,25 +429,25 @@ const SubmitNewProject: React.FC = () => {
           </div>
 
           {/* Custom Category */}
-          {category === "OTHER" && (
+          {formData.category === "OTHER" && (
             <div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, color: "#3b82f6" }}>
                 <UsergroupAddOutlined style={{ color: "#000" }} /> Custom Category *
               </label>
               <input
                 type="text"
-                value={customCategory}
+                value={formData.customCategory}
                 onChange={(e) => {
-                  setCustomCategory(e.target.value);
-                  setErrors(prev => ({ ...prev, customCategory: validateField('customCategory', e.target.value) }));
+                  setFormData((prev) => ({ ...prev, customCategory: e.target.value }));
+                  setErrors((prev) => ({ ...prev, customCategory: validateField('customCategory', e.target.value) }));
                 }}
                 onBlur={() => handleBlur('customCategory')}
                 placeholder="Enter custom category"
-                style={{ 
-                  width: "100%", 
-                  padding: 8, 
-                  border: `1px solid ${shouldShowError('customCategory') ? '#ef4444' : '#d1d5db'}`, 
-                  borderRadius: 6 
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: `1px solid ${shouldShowError('customCategory') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
                 }}
               />
               {shouldShowError('customCategory') && (
@@ -541,18 +466,18 @@ const SubmitNewProject: React.FC = () => {
                 <DollarCircleOutlined style={{ color: "#000" }} /> Funding Range *
               </label>
               <select
-                value={fundingRange}
+                value={formData.fundingRange}
                 onChange={(e) => {
-                  setFundingRange(e.target.value);
-                  setErrors(prev => ({ ...prev, fundingRange: validateField('fundingRange', e.target.value) }));
+                  setFormData((prev) => ({ ...prev, fundingRange: e.target.value }));
+                  setErrors((prev) => ({ ...prev, fundingRange: validateField('fundingRange', e.target.value) }));
                 }}
                 onBlur={() => handleBlur('fundingRange')}
-                style={{ 
-                  width: "100%", 
-                  padding: 8, 
-                  border: `1px solid ${shouldShowError('fundingRange') ? '#ef4444' : '#d1d5db'}`, 
-                  borderRadius: 6, 
-                  background: "#f3f4f6" 
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: `1px solid ${shouldShowError('fundingRange') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
+                  background: "#f3f4f6",
                 }}
               >
                 <option value="">Select funding range</option>
@@ -574,20 +499,20 @@ const SubmitNewProject: React.FC = () => {
               </label>
               <input
                 type="number"
-                value={teamSize}
+                value={formData.teamSize}
                 onChange={(e) => {
-                  setTeamSize(e.target.value);
-                  setErrors(prev => ({ ...prev, teamSize: validateField('teamSize', e.target.value) }));
+                  setFormData((prev) => ({ ...prev, teamSize: e.target.value }));
+                  setErrors((prev) => ({ ...prev, teamSize: validateField('teamSize', e.target.value) }));
                 }}
                 onBlur={() => handleBlur('teamSize')}
                 placeholder="Number of team members"
                 min="1"
                 max="1000"
-                style={{ 
-                  width: "100%", 
-                  padding: 8, 
-                  border: `1px solid ${shouldShowError('teamSize') ? '#ef4444' : '#d1d5db'}`, 
-                  borderRadius: 6 
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: `1px solid ${shouldShowError('teamSize') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
                 }}
               />
               {shouldShowError('teamSize') && (
@@ -607,18 +532,18 @@ const SubmitNewProject: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={location}
+                value={formData.location}
                 onChange={(e) => {
-                  setLocation(e.target.value);
-                  setErrors(prev => ({ ...prev, location: validateField('location', e.target.value) }));
+                  setFormData((prev) => ({ ...prev, location: e.target.value }));
+                  setErrors((prev) => ({ ...prev, location: validateField('location', e.target.value) }));
                 }}
                 onBlur={() => handleBlur('location')}
                 placeholder="City, Country"
-                style={{ 
-                  width: "100%", 
-                  padding: 8, 
-                  border: `1px solid ${shouldShowError('location') ? '#ef4444' : '#d1d5db'}`, 
-                  borderRadius: 6 
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: `1px solid ${shouldShowError('location') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
                 }}
               />
               {shouldShowError('location') && (
@@ -634,18 +559,18 @@ const SubmitNewProject: React.FC = () => {
               </label>
               <input
                 type="url"
-                value={website}
+                value={formData.website}
                 onChange={(e) => {
-                  setWebsite(e.target.value);
-                  setErrors(prev => ({ ...prev, website: validateField('website', e.target.value) }));
+                  setFormData((prev) => ({ ...prev, website: e.target.value }));
+                  setErrors((prev) => ({ ...prev, website: validateField('website', e.target.value) }));
                 }}
                 onBlur={() => handleBlur('website')}
                 placeholder="https://yourproject.com"
-                style={{ 
-                  width: "100%", 
-                  padding: 8, 
-                  border: `1px solid ${shouldShowError('website') ? '#ef4444' : '#d1d5db'}`, 
-                  borderRadius: 6 
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: `1px solid ${shouldShowError('website') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
                 }}
               />
               {shouldShowError('website') && (
@@ -663,19 +588,19 @@ const SubmitNewProject: React.FC = () => {
               <FileTextOutlined style={{ color: "#000" }} /> Project Description *
             </label>
             <textarea
-              value={description}
+              value={formData.description}
               onChange={(e) => {
-                setDescription(e.target.value);
-                setErrors(prev => ({ ...prev, description: validateField('description', e.target.value) }));
+                setFormData((prev) => ({ ...prev, description: e.target.value }));
+                setErrors((prev) => ({ ...prev, description: validateField('description', e.target.value) }));
               }}
               onBlur={() => handleBlur('description')}
               placeholder="Enter project description (minimum 50 characters)"
-              style={{ 
-                width: "100%", 
-                padding: 8, 
-                border: `1px solid ${shouldShowError('description') ? '#ef4444' : '#d1d5db'}`, 
-                borderRadius: 6, 
-                minHeight: 100 
+              style={{
+                width: "100%",
+                padding: 8,
+                border: `1px solid ${shouldShowError('description') ? '#ef4444' : '#d1d5db'}`,
+                borderRadius: 6,
+                minHeight: 100,
               }}
             />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
@@ -686,7 +611,7 @@ const SubmitNewProject: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ color: "#64748b", fontSize: 12 }}>
-                  {description.trim().length}/2000 characters
+                  {formData.description.trim().length}/2000 characters
                 </div>
               )}
               <div style={{ color: "#64748b", fontSize: 12 }}>
@@ -708,25 +633,27 @@ const SubmitNewProject: React.FC = () => {
             {/* Pitch Deck */}
             <div>
               <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Pitch Deck (PDF) *</label>
-              <label style={{ 
-                display: "block", 
-                padding: 8, 
-                border: `2px solid ${shouldShowError('pitchDeck') ? '#ef4444' : '#d1d5db'}`, 
-                borderRadius: 6, 
-                textAlign: "center", 
-                cursor: "pointer", 
-                opacity: 0.7 
-              }}>
+              <label
+                style={{
+                  display: "block",
+                  padding: 8,
+                  border: `2px solid ${shouldShowError('pitchDeck') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  opacity: 0.7,
+                }}
+              >
                 <UploadOutlined style={{ fontSize: 24, color: "#000" }} />
                 <p style={{ margin: "8px 0 4px", fontWeight: 500 }}>
-                  {pitchDeck ? pitchDeck.name : 'Click to upload pitch deck'}
+                  {formData.pitchDeck ? formData.pitchDeck.name : 'Click to upload pitch deck'}
                 </p>
                 <p style={{ color: "#64748b", fontSize: 12 }}>PDF up to 10MB</p>
-                <input 
-                  type="file" 
-                  accept=".pdf" 
-                  onChange={(e) => handleFileUpload(e, setPitchDeck, 'pitchDeck')} 
-                  style={{ display: "none" }} 
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => handleFileUpload(e, (file) => setFormData((prev) => ({ ...prev, pitchDeck: file })), 'pitchDeck')}
+                  style={{ display: "none" }}
                 />
               </label>
               {shouldShowError('pitchDeck') && (
@@ -740,25 +667,27 @@ const SubmitNewProject: React.FC = () => {
             {/* Pitch Video */}
             <div>
               <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Pitch Video *</label>
-              <label style={{ 
-                display: "block", 
-                padding: 8, 
-                border: `2px solid ${shouldShowError('pitchVideo') ? '#ef4444' : '#d1d5db'}`, 
-                borderRadius: 6, 
-                textAlign: "center", 
-                cursor: "pointer", 
-                opacity: 0.7 
-              }}>
+              <label
+                style={{
+                  display: "block",
+                  padding: 8,
+                  border: `2px solid ${shouldShowError('pitchVideo') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  opacity: 0.7,
+                }}
+              >
                 <VideoCameraOutlined style={{ fontSize: 24, color: "#000" }} />
                 <p style={{ margin: "8px 0 4px", fontWeight: 500 }}>
-                  {pitchVideo ? pitchVideo.name : 'Click to upload video'}
+                  {formData.pitchVideo ? formData.pitchVideo.name : 'Click to upload video'}
                 </p>
                 <p style={{ color: "#64748b", fontSize: 12 }}>MP4, MOV up to 100MB</p>
-                <input 
-                  type="file" 
-                  accept=".mp4,.mov,.avi" 
-                  onChange={(e) => handleFileUpload(e, setPitchVideo, 'pitchVideo')} 
-                  style={{ display: "none" }} 
+                <input
+                  type="file"
+                  accept=".mp4,.mov,.avi"
+                  onChange={(e) => handleFileUpload(e, (file) => setFormData((prev) => ({ ...prev, pitchVideo: file })), 'pitchVideo')}
+                  style={{ display: "none" }}
                 />
               </label>
               {shouldShowError('pitchVideo') && (
@@ -772,25 +701,27 @@ const SubmitNewProject: React.FC = () => {
             {/* Business Plan */}
             <div>
               <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Business Plan *</label>
-              <label style={{ 
-                display: "block", 
-                padding: 8, 
-                border: `2px solid ${shouldShowError('businessPlan') ? '#ef4444' : '#d1d5db'}`, 
-                borderRadius: 6, 
-                textAlign: "center", 
-                cursor: "pointer", 
-                opacity: 0.7 
-              }}>
+              <label
+                style={{
+                  display: "block",
+                  padding: 8,
+                  border: `2px solid ${shouldShowError('businessPlan') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  opacity: 0.7,
+                }}
+              >
                 <FileOutlined style={{ fontSize: 24, color: "#000" }} />
                 <p style={{ margin: "8px 0 4px", fontWeight: 500 }}>
-                  {businessPlan ? businessPlan.name : 'Click to upload business plan'}
+                  {formData.businessPlan ? formData.businessPlan.name : 'Click to upload business plan'}
                 </p>
                 <p style={{ color: "#64748b", fontSize: 12 }}>PDF, DOC up to 10MB</p>
-                <input 
-                  type="file" 
-                  accept=".pdf,.doc,.docx" 
-                  onChange={(e) => handleFileUpload(e, setBusinessPlan, 'businessPlan')} 
-                  style={{ display: "none" }} 
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => handleFileUpload(e, (file) => setFormData((prev) => ({ ...prev, businessPlan: file })), 'businessPlan')}
+                  style={{ display: "none" }}
                 />
               </label>
               {shouldShowError('businessPlan') && (
@@ -804,25 +735,27 @@ const SubmitNewProject: React.FC = () => {
             {/* Financial Projection */}
             <div>
               <label style={{ display: "block", marginBottom: 4, color: "#3b82f6" }}>Financial Projection *</label>
-              <label style={{ 
-                display: "block", 
-                padding: 8, 
-                border: `2px solid ${shouldShowError('financialProjection') ? '#ef4444' : '#d1d5db'}`, 
-                borderRadius: 6, 
-                textAlign: "center", 
-                cursor: "pointer", 
-                opacity: 0.7 
-              }}>
+              <label
+                style={{
+                  display: "block",
+                  padding: 8,
+                  border: `2px solid ${shouldShowError('financialProjection') ? '#ef4444' : '#d1d5db'}`,
+                  borderRadius: 6,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  opacity: 0.7,
+                }}
+              >
                 <BarChartOutlined style={{ fontSize: 24, color: "#000" }} />
                 <p style={{ margin: "8px 0 4px", fontWeight: 500 }}>
-                  {financialProjection ? financialProjection.name : 'Click to upload financials'}
+                  {formData.financialProjection ? formData.financialProjection.name : 'Click to upload financials'}
                 </p>
                 <p style={{ color: "#64748b", fontSize: 12 }}>PDF, XLS up to 10MB</p>
-                <input 
-                  type="file" 
-                  accept=".pdf,.xls,.xlsx" 
-                  onChange={(e) => handleFileUpload(e, setFinancialProjection, 'financialProjection')} 
-                  style={{ display: "none" }} 
+                <input
+                  type="file"
+                  accept=".pdf,.xls,.xlsx"
+                  onChange={(e) => handleFileUpload(e, (file) => setFormData((prev) => ({ ...prev, financialProjection: file })), 'financialProjection')}
+                  style={{ display: "none" }}
                 />
               </label>
               {shouldShowError('financialProjection') && (

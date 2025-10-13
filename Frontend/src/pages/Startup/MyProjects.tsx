@@ -9,7 +9,7 @@ import {
   PlusCircleOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import { Popconfirm, message } from "antd"; // Add message for notifications
+import { Popconfirm, message } from "antd";
 import type { RootState } from "../../store";
 import { getMyProjects, updateMilestone, getMilestonesByProject, deleteProject } from "../../services/features/project/projectSlice";
 import type { Project as ApiProject } from "../../interfaces/project";
@@ -38,7 +38,6 @@ interface Project {
     completedMilestones: number;
     totalMilestones: number;
     completion: number;
-    daysLeft: number;
   };
 }
 
@@ -46,9 +45,8 @@ const MyProjects: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
-  const [deletingProjectIds, setDeletingProjectIds] = useState<number[]>([]); // Track deleting projects
+  const [deletingProjectIds, setDeletingProjectIds] = useState<number[]>([]);
   
-  // Lấy dữ liệu từ Redux store
   const { projects: apiProjects, milestones: apiMilestones, status, error } = useSelector((state: RootState) => state.project);
   
   // Transform dữ liệu từ API thành định dạng UI
@@ -59,25 +57,121 @@ const MyProjects: React.FC = () => {
       const projectMilestones = getProjectMilestones(project.id);
       const completedMilestones = projectMilestones.filter(m => m.checked).length;
       const totalMilestones = projectMilestones.length;
-      const completion = totalMilestones > 0 ? Math.floor((completedMilestones / totalMilestones) * 100) : 0;
+      const timeline = generateTimeline(project);
+      const completion = calculateCompletionFromTimeline(timeline);
 
       return {
         id: project.id,
         title: project.projectName || "Untitled Project",
         status: project.status || "Unknown",
-        progress: calculateProgress(project),
+        progress: calculateProgressFromTimeline(timeline),
         raised: formatCurrency(project.fundingAmount || 0),
-        target: getTargetAmount(project),
+        target: getFundingRangeDisplay(project.fundingRange),
         stage: mapFundingStageToUI(project.fundingStage),
-        timeline: generateTimeline(project),
+        timeline: timeline,
         milestones: projectMilestones,
         metrics: {
-          activeInvestors: calculateActiveInvestors(project),
+          activeInvestors: project.investorClicks || 0, // Lấy từ dữ liệu thực tế
           completedMilestones,
           totalMilestones,
           completion,
-          daysLeft: calculateDaysLeft(project)
         }
+      };
+    });
+  };
+
+  // Hàm hiển thị fundingRange từ API
+  const getFundingRangeDisplay = (fundingRange: string): string => {
+    const rangeMap: { [key: string]: string } = {
+      'UNDER_50K': 'UNDER $50K',
+      'FROM_50K_TO_200K': '$50K - $200K',
+      'FROM_200K_TO_1M': '$200K - $1M',
+      'OVER_1M': 'Over $1M'
+    };
+    return rangeMap[fundingRange] || 'Not specified';
+  };
+
+  // Hàm get status text - CẬP NHẬT THEO YÊU CẦU
+  const getStatusText = (status: string): string => {
+    switch (status.toUpperCase()) {
+      case "APPROVED": return "In Deal";
+      case "DRAFT": return "Pending Review";
+      case "PUBLISHED": return "Active";
+      case "REJECTED": return "Rejected";
+      default: return status;
+    }
+  };
+
+  // Hàm tính progress dựa trên timeline
+  const calculateProgressFromTimeline = (timeline: Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }>): number => {
+    const completedStages = timeline.filter(stage => stage.status === "completed").length;
+    const inProgressStages = timeline.filter(stage => stage.status === "in-progress").length;
+    
+    // Mỗi stage completed = 20%, stage in-progress = 10%
+    const progress = (completedStages * 20) + (inProgressStages * 10);
+    return Math.min(progress, 100);
+  };
+
+  // Hàm tính completion dựa trên timeline
+  const calculateCompletionFromTimeline = (timeline: Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }>): number => {
+    const totalStages = timeline.length;
+    const completedStages = timeline.filter(stage => stage.status === "completed").length;
+    return totalStages > 0 ? Math.floor((completedStages / totalStages) * 100) : 0;
+  };
+
+  const mapFundingStageToUI = (stage: string): string => {
+    const stageMap: { [key: string]: string } = {
+      'SEED': 'Initial Review',
+    };
+    return stageMap[stage] || 'Initial Review';
+  };
+
+  const formatCurrency = (amount: number): string => {
+    if (amount === 0) return '$0';
+    if (amount >= 1000000) {
+      return `$${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 1000) {
+      return `$${(amount / 1000).toFixed(1)}K`;
+    }
+    return `$${amount}`;
+  };
+
+  const generateTimeline = (project: ApiProject): Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }> => {
+    const stages = ['Initial Review', 'Investor Meetings', 'Due Diligence', 'Term Sheet', 'Final Agreement'];
+    const currentStage = mapFundingStageToUI(project.fundingStage);
+    
+    const baseDate = project.createdAt ? new Date(project.createdAt) : new Date();
+
+    return stages.map((stage, index) => {
+      let status: "completed" | "in-progress" | "upcoming" = "upcoming";
+      let date: string = "";
+
+      if (index === 0 && project.createdAt) {
+        date = baseDate.toISOString().split('T')[0];
+      }
+
+      // Xử lý trạng thái DRAFT và PUBLISHED cho Initial Review
+      if (stage === 'Initial Review') {
+        if (project.status === 'DRAFT') {
+          status = 'in-progress';
+        } else if (project.status === 'PUBLISHED') {
+          status = 'completed';
+        }
+      } else {
+        const currentStageIndex = stages.indexOf(currentStage);
+        if (index < currentStageIndex) {
+          status = "completed";
+        } else if (index === currentStageIndex) {
+          status = project.status === 'APPROVED' ? "completed" : "in-progress";
+        } else if (index > currentStageIndex) {
+          status = "upcoming";
+        }
+      }
+
+      return {
+        stage,
+        date: (status === "completed" || status === "in-progress") ? date : "",
+        status
       };
     });
   };
@@ -97,155 +191,42 @@ const MyProjects: React.FC = () => {
     }));
   };
 
-  // Hàm helper để transform dữ liệu
-  const mapFundingStageToUI = (stage: string): string => {
-    const stageMap: { [key: string]: string } = {
-      'SEED': 'Initial Review',
-      'SERIES_A': 'Due Diligence',
-      'SERIES_B': 'Term Sheet',
-      'SERIES_C': 'Final Agreement'
-    };
-    return stageMap[stage] || 'Initial Review';
-  };
-
-  const calculateProgress = (project: ApiProject): number => {
-    const raisedAmount = project.fundingAmount || 0;
-    const rangeMap: { [key: string]: number } = {
-      'UNDER_100K': 100000,
-      '100K_500K': 500000,
-      '500K_1M': 1000000,
-      '1M_5M': 5000000,
-      'OVER_5M': 10000000
-    };
-    const targetAmount = rangeMap[project.fundingRange] || 1000000;
-    if (targetAmount === 0) return 0;
-    const progress = (raisedAmount / targetAmount) * 100;
-    return Math.min(Math.round(progress), 100);
-  };
-
-  const formatCurrency = (amount: number): string => {
-    if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
-    } else if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(1)}K`;
-    }
-    return `$${amount}`;
-  };
-
-  const getTargetAmount = (project: ApiProject): string => {
-    const rangeMap: { [key: string]: string } = {
-      'UNDER_100K': '$100K',
-      '100K_500K': '$500K',
-      '500K_1M': '$1M',
-      '1M_5M': '$5M',
-      'OVER_5M': '$10M+'
-    };
-    return rangeMap[project.fundingRange] || '$1M';
-  };
-
-  const generateTimeline = (project: ApiProject): Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }> => {
-  const stages = ['Initial Review', 'Investor Meetings', 'Due Diligence', 'Term Sheet', 'Final Agreement'];
-  const currentStage = mapFundingStageToUI(project.fundingStage);
-  
-  // Lấy ngày tạo dự án, mặc định là ngày hiện tại nếu không có
-  const baseDate = project.createdAt ? new Date(project.createdAt) : new Date(); // 05/10/2025
-
-  return stages.map((stage, index) => {
-    let status: "completed" | "in-progress" | "upcoming" = "upcoming";
-    let date: string = "";
-
-    // Chỉ gán ngày cho giai đoạn đầu (Initial Review) nếu có createdAt
-    if (index === 0 && project.createdAt) {
-      date = baseDate.toISOString().split('T')[0]; // Chuyển thành chuỗi: "2025-10-05"
-    }
-
-    // Xác định trạng thái dựa trên currentStageIndex và project.status
-    const currentStageIndex = stages.indexOf(currentStage);
-    console.log(`Giai đoạn: ${stage}, index: ${index}, currentStageIndex: ${currentStageIndex}, trạng thái: ${project.status}, ngày: ${date}`); // Ghi log để debug
-
-    if (index < currentStageIndex) {
-      status = "completed";
-    } else if (index === currentStageIndex) {
-      status = project.status === 'APPROVED' ? "completed" : "in-progress";
-    } else if (index > currentStageIndex) {
-      status = "upcoming"; // Hiển thị là "Not started" trong UI
-    }
-
-    // Đảm bảo Initial Review là "in-progress" cho dự án mới (DRAFT/PUBLISHED)
-    if (index === 0 && project.status !== 'APPROVED' && date) {
-      status = "in-progress";
-    }
-
-    return {
-      stage,
-      date: (status === "completed" || status === "in-progress") ? date : "",
-      status
-    };
-  });
-};
-
-  const calculateActiveInvestors = (project: ApiProject): number => {
-    const investorMap: { [key: string]: number } = {
-      'DRAFT': 0,
-      'PUBLISHED': Math.floor(Math.random() * 3) + 1,
-      'APPROVED': Math.floor(Math.random() * 5) + 3,
-      'REJECTED': 0
-    };
-    return investorMap[project.status] || 0;
-  };
-
-  const calculateDaysLeft = (project: ApiProject): number => {
-    if (!project.createdAt) return 30;
-    
-    const createdDate = new Date(project.createdAt);
-    const now = new Date();
-    const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    const stageDays: { [key: string]: number } = {
-      'SEED': 90,
-      'SERIES_A': 120,
-      'SERIES_B': 150,
-      'SERIES_C': 180
-    };
-    
-    const totalDays = stageDays[project.fundingStage] || 90;
-    return Math.max(totalDays - daysSinceCreation, 0);
-  };
-
   // State cho projects hiển thị
   const [projects, setProjects] = useState<Project[]>([]);
-  // State cho errors hiển thị trong UI
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Load projects khi component mount
+  // Các useEffect
   useEffect(() => {
     dispatch(getMyProjects() as any);
   }, [dispatch]);
 
-  // Auto select first project khi có data
   useEffect(() => {
     if (apiProjects && apiProjects.length > 0 && !selectedProject) {
       setSelectedProject(apiProjects[0].id);
     }
   }, [apiProjects, selectedProject]);
 
-  // Load milestones khi selected project thay đổi
   useEffect(() => {
     if (selectedProject) {
       dispatch(getMilestonesByProject(selectedProject) as any);
     }
   }, [selectedProject, dispatch]);
 
-  // Update projects khi API data thay đổi
   useEffect(() => {
     if (apiProjects && apiProjects.length > 0) {
       const transformedProjects = transformApiProjectsToUI(apiProjects);
       setProjects(transformedProjects);
     } else {
       setProjects([]);
-      setSelectedProject(null); // Reset selectedProject if no projects
+      setSelectedProject(null);
     }
   }, [apiProjects, apiMilestones]);
+
+  // Debug dữ liệu API
+  useEffect(() => {
+    console.log('API Projects:', apiProjects);
+    console.log('Transformed Projects:', projects);
+  }, [apiProjects, projects]);
 
   const handleCheckboxChange = async (index: number) => {
     if (!selectedProject) return;
@@ -284,8 +265,8 @@ const MyProjects: React.FC = () => {
   };
 
   const handleDeleteProject = async (projectId: number) => {
-    setDeletingProjectIds(prev => [...prev, projectId]); // Add to deleting state
-    setDeleteError(null); // Clear previous errors
+    setDeletingProjectIds(prev => [...prev, projectId]);
+    setDeleteError(null);
     try {
       await dispatch(deleteProject(projectId) as any);
       message.success('Project deleted successfully');
@@ -296,17 +277,17 @@ const MyProjects: React.FC = () => {
       setDeleteError(error.payload || 'Failed to delete project');
       message.error(error.payload || 'Failed to delete project');
     } finally {
-      setDeletingProjectIds(prev => prev.filter(id => id !== projectId)); // Remove from deleting state
+      setDeletingProjectIds(prev => prev.filter(id => id !== projectId));
     }
   };
 
   const selectedProjectData = projects.find(project => project.id === selectedProject);
 
   const getStatusColor = (status: string) => {
-    switch (status.toUpperCase()) { // Normalize case for safety
+    switch (status.toUpperCase()) {
       case "APPROVED": return { background: "#dcfce7", color: "#16a34a" };
-      case "DRAFT":
-      case "PUBLISHED": return { background: "#fefce8", color: "#d97706" };
+      case "DRAFT": return { background: "#fef3c7", color: "#92400e" };
+      case "PUBLISHED": return { background: "#dbeafe", color: "#1e40af" };
       case "REJECTED": return { background: "#fee2e2", color: "#ef4444" };
       default: return { background: "#e5e7eb", color: "#6b7280" };
     }
@@ -408,7 +389,6 @@ const MyProjects: React.FC = () => {
         </button>
       </div>
 
-      {/* Display deletion error if any */}
       {deleteError && (
         <div style={{ color: "red", textAlign: "center", marginBottom: 16 }}>
           {deleteError}
@@ -416,78 +396,80 @@ const MyProjects: React.FC = () => {
       )}
 
       {/* Top - Project Cards */}
-<div style={{ 
-  display: "flex", 
-  gap: 16, 
-  marginBottom: 24, 
-  overflowX: "auto",
-  paddingBottom: 8
-}}>
-  {projects.map((project) => {
-    const statusStyle = getStatusColor(project.status);
-    const isDeleting = deletingProjectIds.includes(project.id);
-    return (
-      <div 
-        key={project.id}
-        onClick={() => !isDeleting && setSelectedProject(project.id)}
-        style={{ 
-          flex: "0 0 300px", // Fixed width, không co giãn
-          minWidth: 300, // Chiều rộng tối thiểu
-          background: "#fff", 
-          borderRadius: 12, 
-          padding: 16, 
-          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-          border: selectedProject === project.id ? "2px solid #3b82f6" : "2px solid transparent",
-          cursor: isDeleting ? "not-allowed" : "pointer",
-          opacity: isDeleting ? 0.6 : 1,
-          transition: "all 0.2s ease"
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 16 }}>{project.title}</h3>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ 
-              fontSize: 12, 
-              background: statusStyle.background, 
-              color: statusStyle.color, 
-              padding: "2px 8px", 
-              borderRadius: 999 
-            }}>
-              {project.status}
-            </span>
-            <Popconfirm
-              title="Are you sure you want to delete this project?"
-              onConfirm={() => handleDeleteProject(project.id)}
-              okText="Yes"
-              cancelText="No"
-              disabled={isDeleting}
+      <div style={{ 
+        display: "flex", 
+        gap: 16, 
+        marginBottom: 24, 
+        overflowX: "auto",
+        paddingBottom: 8
+      }}>
+        {projects.map((project) => {
+          const statusStyle = getStatusColor(project.status);
+          const isDeleting = deletingProjectIds.includes(project.id);
+          // SỬ DỤNG getStatusText MỚI ĐỂ HIỂN THỊ STATUS
+          const displayStatus = getStatusText(project.status);
+          
+          return (
+            <div 
+              key={project.id}
+              onClick={() => !isDeleting && setSelectedProject(project.id)}
+              style={{ 
+                flex: "0 0 300px",
+                minWidth: 300,
+                background: "#fff", 
+                borderRadius: 12, 
+                padding: 16, 
+                boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+                border: selectedProject === project.id ? "2px solid #3b82f6" : "2px solid transparent",
+                cursor: isDeleting ? "not-allowed" : "pointer",
+                opacity: isDeleting ? 0.6 : 1,
+                transition: "all 0.2s ease"
+              }}
             >
-              <DeleteOutlined 
-                style={{ 
-                  color: isDeleting ? "#d1d5db" : "#ef4444", 
-                  cursor: isDeleting ? "not-allowed" : "pointer" 
-                }} 
-              />
-            </Popconfirm>
-          </div>
-        </div>
-        <p style={{ margin: "8px 0", fontSize: 12, color: "#64748b" }}>Progress {project.progress}%</p>
-        <div style={{ height: 6, background: "#e5e7eb", borderRadius: 999 }}>
-          <div style={{ 
-            width: `${project.progress}%`, 
-            height: "100%", 
-            background: "#3b82f6", 
-            borderRadius: 999 
-          }} />
-        </div>
-        <p style={{ margin: "8px 0 0", fontSize: 14, fontWeight: 500 }}>
-          {project.raised} / {project.target}
-        </p>
-        <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Stage: {project.stage}</p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ margin: 0, fontSize: 16 }}>{project.title}</h3>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ 
+                    fontSize: 12, 
+                    background: statusStyle.background, 
+                    color: statusStyle.color, 
+                    padding: "2px 8px", 
+                    borderRadius: 999 
+                  }}>
+                    {/* HIỂN THỊ STATUS TEXT MỚI */}
+                    {displayStatus}
+                  </span>
+                  <Popconfirm
+                    title="Are you sure you want to delete this project?"
+                    onConfirm={() => handleDeleteProject(project.id)}
+                    okText="Yes"
+                    cancelText="No"
+                    disabled={isDeleting}
+                  >
+                    <DeleteOutlined 
+                      style={{ 
+                        color: isDeleting ? "#d1d5db" : "#ef4444", 
+                        cursor: isDeleting ? "not-allowed" : "pointer" 
+                      }} 
+                    />
+                  </Popconfirm>
+                </div>
+              </div>
+              <p style={{ margin: "8px 0", fontSize: 12, color: "#64748b" }}>Progress {project.progress}%</p>
+              <div style={{ height: 6, background: "#e5e7eb", borderRadius: 999 }}>
+                <div style={{ 
+                  width: `${project.progress}%`, 
+                  height: "100%", 
+                  background: "#3b82f6", 
+                  borderRadius: 999 
+                }} />
+              </div>
+              <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Target: {project.target}</p>
+              <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Stage: {project.stage}</p>
+            </div>
+          );
+        })}
       </div>
-    );
-  })}
-</div>
 
       {selectedProjectData && (
         <>
@@ -604,12 +586,6 @@ const MyProjects: React.FC = () => {
               <div style={{ flex: 1, minWidth: 150, background: "#eff6ff", borderRadius: 12, padding: 16, textAlign: "center" }}>
                 <h2 style={{ margin: 0, color: "#3b82f6" }}>{selectedProjectData.metrics.completion}%</h2>
                 <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Completion</p>
-              </div>
-              <div style={{ flex: 1, minWidth: 150, background: "#eff6ff", borderRadius: 12, padding: 16, textAlign: "center" }}>
-                <h2 style={{ margin: 0, color: selectedProjectData.metrics.daysLeft < 0 ? "#ef4444" : "#3b82f6" }}>
-                  {selectedProjectData.metrics.daysLeft}
-                </h2>
-                <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Days Left</p>
               </div>
             </div>
           </div>
