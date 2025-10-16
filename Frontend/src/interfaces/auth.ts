@@ -12,6 +12,7 @@ export interface User {
   phoneNumber?: string;
   linkedInProfile?: string;
   companyWebsite?: string;
+  country?: string;
   profilePictureUrl?: string;
   companyLogo?: string;
   startupName?: string;
@@ -25,6 +26,7 @@ export interface User {
   investmentFocus?: string;
   investmentRange?: string;
   investmentExperience?: string;
+  twoFactorEnabled?: boolean;
 }
 
 export interface LoginCredentials {
@@ -78,6 +80,11 @@ export interface InvestorProfileResponse {
   investmentFocus?: string;
   investmentRange?: string;
   investmentExperience?: string;
+  // new fields returned by backend
+  country?: string;
+  phoneNumber?: string;
+  linkedInUrl?: string;
+  twoFactorEnabled?: boolean;
 }
 
 export interface LoginResponse {
@@ -98,4 +105,31 @@ export interface AuthState {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+}
+
+// Account DTOs / responses matching backend
+export type Role = "ADMIN" | "START_UP" | "INVESTOR";
+export type Status = "ACTIVE" | "INACTIVE" | "DELETED";
+
+export interface AccountResponse {
+  id: number | string;
+  email: string;
+  role: Role;
+  status: Status;
+  token?: string | null;
+  createdAt?: string;
+}
+
+export interface AccountCreateDTO {
+  email: string;
+  password: string;
+  role: Role;
+  status: Status;
+}
+
+export interface AccountUpdateDTO {
+  email?: string;
+  password?: string;
+  status?: Status;
+  role?: Role;
 }

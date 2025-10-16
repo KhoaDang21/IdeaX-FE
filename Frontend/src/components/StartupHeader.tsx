@@ -78,13 +78,20 @@ const StartupHeader: FC = () => {
         if (path.startsWith('/startup/new-project')) return 'Create New Project'
         return 'Startup Dashboard'
     })()
+    const subtitle = (() => {
+        if (path.startsWith('/startup/my-projects')) return 'Track your project progress and manage milestones'
+        if (path.startsWith('/startup/roommeet')) return 'Join video calls and schedule meetings with investors'
+        if (path.startsWith('/startup/profile')) return 'Manage your personal information and startup details'
+        if (path.startsWith('/startup/payment')) return 'Manage withdrawal requests and track disbursements'
+        return 'Manage your projects and connect with investors'
+    })()
 
     return (
         <header style={{ background: '#DBEAFE', padding: '16px 18px', borderBottom: '1px solid #e5e7eb' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ flex: 1 }}>
                     <h2 style={{ margin: 0, color: '#34419A', textAlign: 'left' }}>{title}</h2>
-                    <span style={{ color: '#6b7280', display: 'block', textAlign: 'left' }}>Manage your projects and connect with investors</span>
+                    <span style={{ color: '#6b7280', display: 'block', textAlign: 'left' }}>{subtitle}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={iconWrap}>
