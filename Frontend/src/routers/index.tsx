@@ -21,6 +21,7 @@ import ProjectManagement from '../pages/Admin/ProjectManagement'
 import FinancialManagement from '../pages/Admin/FinancialManagement'
 import RoomAndContract from '../pages/Admin/RoomAndContract'
 import AdminLayout from '../components/AdminLayout'
+import ProjectDetails from '../pages/Startup/ProjectDetails';
 import ProfileInvestor from '../pages/Investor/ProfileInvestor'
 
 // admin layout moved to components/AdminLayout
@@ -47,6 +48,7 @@ export default function AppRoutes() {
                 <Route path="profile" element={<Profile />} />
                 <Route path="payment" element={<Payment />} />
                 <Route path="new-project" element={<SubmitNewProject />} />
+                <Route path="projects/:id" element={<ProjectDetails />} />
             </Route>
             <Route path="/investor" element={<InvestorLayout />}>
                 <Route path="find-projects" element={<FindProjects />} />

@@ -75,6 +75,7 @@ const StartupHeader: FC = () => {
         if (path.startsWith('/startup/roommeet')) return 'Roommeet'
         if (path.startsWith('/startup/profile')) return 'Profile'
         if (path.startsWith('/startup/payment')) return 'Payment'
+        if (path.startsWith('/startup/new-project')) return 'Create New Project'
         return 'Startup Dashboard'
     })()
     const subtitle = (() => {
