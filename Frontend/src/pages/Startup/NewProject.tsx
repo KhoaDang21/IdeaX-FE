@@ -129,7 +129,7 @@ const SubmitNewProject: React.FC = () => {
 
       case 'description':
         if (!value || value.trim().length === 0) return 'Description is required';
-        if (value.trim().length < 50) return 'Description must be at least 50 characters long';
+        if (value.trim().length < 10) return 'Description must be at least 10 characters long';
         if (value.trim().length > 2000) return 'Description must be less than 2000 characters';
         return '';
 
@@ -594,7 +594,7 @@ const SubmitNewProject: React.FC = () => {
                 setErrors((prev) => ({ ...prev, description: validateField('description', e.target.value) }));
               }}
               onBlur={() => handleBlur('description')}
-              placeholder="Enter project description (minimum 50 characters)"
+              placeholder="Enter project description (minimum 10 characters)"
               style={{
                 width: "100%",
                 padding: 8,
@@ -615,7 +615,7 @@ const SubmitNewProject: React.FC = () => {
                 </div>
               )}
               <div style={{ color: "#64748b", fontSize: 12 }}>
-                Minimum 50 characters required
+                Minimum 10 characters required
               </div>
             </div>
           </div>

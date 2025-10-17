@@ -12,7 +12,7 @@ export interface Project {
   location: string;
   website?: string;
   description: string;
-  status: "DRAFT" | "PUBLISHED" | "APPROVED" | "REJECTED";
+  status: "DRAFT" | "PUBLISHED" | "APPROVED" | "REJECTED" | "COMPLETE";
   pitchDeck?: string; // URL from API
   pitchVideo?: string; // URL from API
   businessPlan?: string; // URL from API
