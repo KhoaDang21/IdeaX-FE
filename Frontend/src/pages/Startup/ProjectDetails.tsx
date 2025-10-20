@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProjectById, clearProject } from '../../services/features/project/projectSlice';
 import type { RootState, AppDispatch } from '../../store';
-import type { Project } from '../../interfaces/project';
 import { App, Card, Row, Col, Tag } from 'antd';
 import {
   InfoCircleOutlined,

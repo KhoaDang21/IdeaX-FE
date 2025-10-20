@@ -40,7 +40,7 @@ interface Activity {
 
 const StartupDashboard: FC = () => {
   const dispatch = useDispatch();
-  const { projects: apiProjects, status } = useSelector((state: RootState) => state.project);
+  const { projects: apiProjects } = useSelector((state: RootState) => state.project);
   
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
@@ -87,63 +87,72 @@ const StartupDashboard: FC = () => {
     return rangeMap[fundingRange] || 'Not specified';
   };
 
-  // Hàm map funding stage - GIỐNG MyProjects
-  const mapFundingStageToUI = (stage: string): string => {
-    const stageMap: { [key: string]: string } = {
-      'SEED': 'Initial Review',
-    };
-    return stageMap[stage] || 'Initial Review';
-  };
-
-  // Hàm tính progress - GIỐNG MyProjects
-  const calculateProgressFromTimeline = (timeline: Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }>): number => {
-    const completedStages = timeline.filter(stage => stage.status === "completed").length;
-    const inProgressStages = timeline.filter(stage => stage.status === "in-progress").length;
-    
-    // Mỗi stage completed = 20%, stage in-progress = 10%
-    const progress = (completedStages * 20) + (inProgressStages * 10);
-    return Math.min(progress, 100);
-  };
-
   // Hàm generate timeline - GIỐNG MyProjects
   const generateTimeline = (project: ApiProject): Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }> => {
-    const stages = ['Initial Review', 'Investor Meetings', 'Due Diligence', 'Term Sheet', 'Final Agreement'];
-    const currentStage = mapFundingStageToUI(project.fundingStage);
-    
-    const baseDate = project.createdAt ? new Date(project.createdAt) : new Date();
-
-    return stages.map((stage, index) => {
+    const stages = ['Initial Review', 'Contract Signing', 'Funding Completion'];
+    return stages.map((stage) => {
       let status: "completed" | "in-progress" | "upcoming" = "upcoming";
-      let date: string = "";
-
-      if (index === 0 && project.createdAt) {
-        date = baseDate.toISOString().split('T')[0];
+      let date = "";
+      if (stage === 'Initial Review' && project.createdAt) {
+        date = new Date(project.createdAt).toISOString().split('T')[0];
       }
-
-      // Xử lý trạng thái DRAFT và PUBLISHED cho Initial Review - GIỐNG MyProjects
-      if (stage === 'Initial Review') {
-        if (project.status === 'DRAFT') {
-          status = 'in-progress';
-        } else if (project.status === 'PUBLISHED') {
+      switch (project.status) {
+        case 'DRAFT':
+          if (stage === 'Initial Review') status = 'in-progress';
+          break;
+        case 'PUBLISHED':
+          if (stage === 'Initial Review') status = 'completed';
+          else if (stage === 'Contract Signing') status = 'in-progress';
+          break;
+        case 'APPROVED':
+          if (['Initial Review', 'Contract Signing'].includes(stage)) status = 'completed';
+          else if (stage === 'Funding Completion') status = 'in-progress';
+          break;
+        case 'COMPLETE':
           status = 'completed';
-        }
-      } else {
-        const currentStageIndex = stages.indexOf(currentStage);
-        if (index < currentStageIndex) {
-          status = "completed";
-        } else if (index === currentStageIndex) {
-          status = project.status === 'APPROVED' ? "completed" : "in-progress";
-        } else if (index > currentStageIndex) {
-          status = "upcoming";
-        }
+          break;
       }
-
-      return {
-        stage,
-        date: (status === "completed" || status === "in-progress") ? date : "",
-        status
-      };
+      if (status === "completed" && !date) {
+        date = new Date().toISOString().split('T')[0];
+      }
+      return { stage, date, status };
     });
+  };
+
+  // Hàm tính progress - GIỐNG MyProjects (17%, 50%, 83%, 100%)
+  const calculateProgressFromTimeline = (timeline: Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }>): number => {
+    const completedStages = timeline.filter(s => s.status === "completed").length;
+    const inProgressStages = timeline.filter(s => s.status === "in-progress").length;
+    const progress = (completedStages * 33.33) + (inProgressStages * 16.67);
+    return Math.min(Math.round(progress), 100);
+  };
+
+  // Hàm lấy stage name với trạng thái - GIỐNG MyProjects
+  const getStageName = (project: ApiProject): string => {
+    const timeline = generateTimeline(project);
+    const order: Record<string, number> = { "Initial Review": 0, "Contract Signing": 1, "Funding Completion": 2 };
+    const sortedTimeline = [...timeline].sort((a, b) => order[a.stage] - order[b.stage]);
+    
+    let stageName = "Initial Review";
+    let stageStatus: "completed" | "in-progress" | "upcoming" = "upcoming";
+    
+    for (const item of sortedTimeline) {
+      if (item.status === "completed" || item.status === "in-progress") {
+        stageName = item.stage;
+        stageStatus = item.status;
+      }
+    }
+
+    let stage = stageName;
+    if (stageStatus === 'in-progress') {
+      stage += ' (Currently in progress)';
+    }
+    const lastStage = sortedTimeline[sortedTimeline.length - 1];
+    if (lastStage?.status === 'completed') {
+      stage = `${lastStage.stage} (Completed)`;
+    }
+
+    return stage;
   };
 
   // Hàm get status color - GIỐNG MyProjects
@@ -153,6 +162,7 @@ const StartupDashboard: FC = () => {
       case "DRAFT": return { background: "#fef3c7", color: "#92400e" };
       case "PUBLISHED": return { background: "#dbeafe", color: "#1e40af" };
       case "REJECTED": return { background: "#fee2e2", color: "#ef4444" };
+      case "COMPLETE": return { background: "#e0f2fe", color: "#0284c7" };
       default: return { background: "#e5e7eb", color: "#6b7280" };
     }
   };
@@ -164,6 +174,7 @@ const StartupDashboard: FC = () => {
       case "DRAFT": return "Pending Review";
       case "PUBLISHED": return "Active";
       case "REJECTED": return "Rejected";
+      case "COMPLETE": return "Completed";
       default: return status;
     }
   };
@@ -391,6 +402,7 @@ const StartupDashboard: FC = () => {
             {apiProjects && apiProjects.slice(0, 3).map((project) => {
               const timeline = generateTimeline(project);
               const progress = calculateProgressFromTimeline(timeline);
+              const stage = getStageName(project);
               const statusStyle = getStatusColor(project.status || '');
               const statusText = getStatusText(project.status || '');
               
@@ -401,9 +413,6 @@ const StartupDashboard: FC = () => {
                       <h4 style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', margin: 0 }}>
                         {project.projectName || 'Untitled Project'}
                       </h4>
-                      <p style={{ fontSize: 14, color: '#475569', margin: '4px 0 0' }}>
-                        {project.description || 'No description available'}
-                      </p>
                       <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>
                         {project.category} • {project.fundingStage} • {formatTimeAgo(new Date(project.createdAt))}
                       </p>
@@ -429,7 +438,7 @@ const StartupDashboard: FC = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                     <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                      Deal Stage: <span style={{ fontWeight: 500 }}>{mapFundingStageToUI(project.fundingStage)}</span>
+                      Stage: <span style={{ fontWeight: 500 }}>{stage}</span>
                     </p>
                     <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>{progress}%</p>
                     <button 
