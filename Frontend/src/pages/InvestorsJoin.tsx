@@ -74,7 +74,16 @@ const InvestorsJoin: FC = () => {
 
     const validateEmail = (value: string) => {
         const email = (value || '').trim();
-        return /^\S+@\S+\.\S+$/.test(email);
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        return emailRegex.test(email);
+    };
+
+    const validatePassword = (password: string) => {
+        // Password must be at least 8 characters, contain at least one letter and one number
+        if (password.length < 8) return false;
+        const hasLetter = /[a-zA-Z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        return hasLetter && hasNumber;
     };
 
     // Clear a specific field error when user types
@@ -99,7 +108,9 @@ const InvestorsJoin: FC = () => {
         if (!trimmed.email) newErrors.email = 'Vui lòng nhập email';
         else if (!validateEmail(trimmed.email)) newErrors.email = 'Email không hợp lệ';
         if (!password) newErrors.password = 'Vui lòng nhập mật khẩu';
-        else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
+        else if (!validatePassword(password)) {
+            newErrors.password = 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ cái và số';
+        }
         if (!confirmPassword) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
         else if (password !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
         // Validate các field optional nhưng vẫn báo nếu trống (nếu muốn bắt buộc)
@@ -110,7 +121,7 @@ const InvestorsJoin: FC = () => {
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
-            message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
+            message.error('Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới');
             return;
         }
         setSubmitting(true);

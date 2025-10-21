@@ -3,8 +3,6 @@ import { UserOutlined, BankOutlined } from "@ant-design/icons";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../store";
 import { getStartupProfile, updateStartupProfile } from "../../services/features/auth/authSlice";
-import { api } from "../../services/constant/axiosInstance";
-import { BASE_URL, STARTUP_PROFILE_UPLOAD_ENDPOINT } from "../../services/constant/apiConfig";
 import { App } from "antd";
 
 const Profile: React.FC = () => {
@@ -28,6 +26,12 @@ const Profile: React.FC = () => {
     numberOfTeamMembers: "",
     aboutUs: "",
   });
+
+  // File state for uploads
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user?.role === "startup" && user.id) {
@@ -66,62 +70,88 @@ const Profile: React.FC = () => {
   };
 
   // Upload file to backend and set returned URL
-  const handleFileUpload = async (f?: File) => {
-    if (!f) return;
-    const allowed = ["image/jpeg", "image/png", "image/gif"];
-    const maxBytes = 2 * 1024 * 1024;
-    if (!allowed.includes(f.type)) {
-      message.error('Only JPG/PNG/GIF allowed');
-      return;
-    }
-    if (f.size > maxBytes) {
-      message.error('File too large (max 2MB)');
-      return;
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    // Validate required fields
+    if (!form.fullName.trim()) errors.fullName = 'Họ tên không được để trống';
+    if (!form.startupName.trim()) errors.startupName = 'Tên startup không được để trống';
+
+    // Validate email format (if provided)
+    if (form.linkedInProfile && !form.linkedInProfile.includes('linkedin.com')) {
+      errors.linkedInProfile = 'LinkedIn profile phải là URL hợp lệ';
     }
 
-    // Build form data and upload
-    const formData = new FormData();
-    formData.append('file', f, f.name);
-    try {
-      message.loading({ content: 'Uploading image...', key: 'upload', duration: 0 });
-      if (!user?.id) throw new Error('User not found');
-      const resp = await api.upload<any>(STARTUP_PROFILE_UPLOAD_ENDPOINT(user.id), formData);
-      const data = resp.data;
-      if (data && data.profilePictureUrl) {
-        const url = data.profilePictureUrl.startsWith('http') ? data.profilePictureUrl : `${BASE_URL}${data.profilePictureUrl}`;
-        setForm(prev => ({ ...prev, profilePictureUrl: url }));
+    // Validate website URL (if provided)
+    if (form.companyWebsite) {
+      try {
+        new URL(form.companyWebsite);
+      } catch {
+        errors.companyWebsite = 'Website phải là URL hợp lệ (ví dụ: https://example.com)';
       }
-
-      // Refresh profile in store so header/sidebar update
-      try { (dispatch(getStartupProfile(user.id) as any)); } catch (e) { /* ignore */ }
-
-      message.success({ content: 'Upload thành công', key: 'upload' });
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const text = err?.response?.data || err?.message || 'Upload thất bại';
-      message.error({ content: `Lỗi upload${status ? ' (status ' + status + ')' : ''}: ${text}`, key: 'upload' });
     }
+
+    // Validate phone number (if provided)
+    if (form.phoneNumber && !/^[\+]?[0-9\s\-\(\)]{10,}$/.test(form.phoneNumber)) {
+      errors.phoneNumber = 'Số điện thoại không hợp lệ';
+    }
+
+    // Validate team members (if provided)
+    if (form.numberOfTeamMembers && (isNaN(Number(form.numberOfTeamMembers)) || Number(form.numberOfTeamMembers) < 0)) {
+      errors.numberOfTeamMembers = 'Số thành viên phải là số dương';
+    }
+
+    // Validate file upload
+    if (profilePictureFile) {
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+
+      if (profilePictureFile.size > maxSize) {
+        errors.profilePicture = 'File ảnh không được vượt quá 2MB';
+      } else if (!allowedTypes.includes(profilePictureFile.type)) {
+        errors.profilePicture = 'Chỉ chấp nhận file ảnh (JPG, PNG, GIF)';
+      }
+    }
+
+    return errors;
   };
 
   const onSave = () => {
     if (!user?.id) return;
+
+    // Validate form
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      message.error('Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới');
+      return;
+    }
+
+    // Clear validation errors if form is valid
+    setValidationErrors({});
+
+    // Create FormData for multipart/form-data
+    const formData = new FormData();
+    formData.append('fullName', form.fullName);
+    formData.append('phoneNumber', form.phoneNumber || '');
+    formData.append('linkedInProfile', form.linkedInProfile || '');
+    formData.append('companyWebsite', form.companyWebsite || '');
+    formData.append('startupName', form.startupName || '');
+    formData.append('industryCategory', form.industryCategory || '');
+    formData.append('fundingStage', form.fundingStage || '');
+    formData.append('location', form.location || '');
+    formData.append('numberOfTeamMembers', form.numberOfTeamMembers || '');
+    formData.append('aboutUs', form.aboutUs || '');
+
+    if (profilePictureFile) {
+      formData.append('profilePictureUrl', profilePictureFile);
+    }
+
     message.loading({ content: 'Đang lưu...', key: 'profile', duration: 0 })
       ; (dispatch(updateStartupProfile({
         accountId: user.id,
-        profileData: {
-          fullName: form.fullName,
-          phoneNumber: form.phoneNumber || undefined,
-          linkedInProfile: form.linkedInProfile || undefined,
-          companyWebsite: form.companyWebsite || undefined,
-          profilePictureUrl: form.profilePictureUrl || undefined,
-          companyLogo: form.companyLogo || undefined,
-          startupName: form.startupName || undefined,
-          industryCategory: form.industryCategory || undefined,
-          fundingStage: form.fundingStage || undefined,
-          location: form.location || undefined,
-          numberOfTeamMembers: form.numberOfTeamMembers ? Number(form.numberOfTeamMembers) : undefined,
-          aboutUs: form.aboutUs || undefined,
-        }
+        profileData: formData
       }) as any))
         .unwrap()
         .then(() => {
@@ -142,12 +172,12 @@ const Profile: React.FC = () => {
           </h3>
 
           <div style={gridStyle}>
-            <Input placeholder="Full Name *" value={form.fullName} onChange={onChange("fullName")} />
+            <Input placeholder="Full Name *" value={form.fullName} onChange={onChange("fullName")} error={validationErrors.fullName} />
             <Input placeholder="Email Address" value={user?.email || ""} disabled />
-            <Input placeholder="Phone Number" value={form.phoneNumber} onChange={onChange("phoneNumber")} />
+            <Input placeholder="Phone Number" value={form.phoneNumber} onChange={onChange("phoneNumber")} error={validationErrors.phoneNumber} />
             <Input placeholder="Role" value={user?.role || ""} disabled />
-            <Input placeholder="LinkedIn Profile" value={form.linkedInProfile} onChange={onChange("linkedInProfile")} />
-            <Input placeholder="Company Website" value={form.companyWebsite} onChange={onChange("companyWebsite")} />
+            <Input placeholder="LinkedIn Profile" value={form.linkedInProfile} onChange={onChange("linkedInProfile")} error={validationErrors.linkedInProfile} />
+            <Input placeholder="Company Website" value={form.companyWebsite} onChange={onChange("companyWebsite")} error={validationErrors.companyWebsite} />
           </div>
 
           {/* Avatar */}
@@ -167,9 +197,31 @@ const Profile: React.FC = () => {
 
               <div>
                 <label htmlFor="upload-input" style={{ display: 'inline-block', padding: '8px 12px', borderRadius: 12, background: '#fff', border: '1px solid #e6e6f0', cursor: 'pointer' }}>Upload New</label>
-                <input id="upload-input" type="file" accept="image/*" onChange={(e) => handleFileUpload(e.target.files ? e.target.files[0] : undefined)} style={{ display: 'none' }} />
+                <input
+                  id="upload-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setProfilePictureFile(file);
+                    if (file) {
+                      // Preview the image
+                      const reader = new FileReader();
+                      reader.onload = (e) => {
+                        setForm(prev => ({ ...prev, profilePictureUrl: e.target?.result as string }));
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  style={{ display: 'none' }}
+                />
               </div>
             </div>
+            {validationErrors.profilePicture && (
+              <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8 }}>
+                {validationErrors.profilePicture}
+              </div>
+            )}
           </div>
 
 
@@ -187,11 +239,11 @@ const Profile: React.FC = () => {
           </h3>
 
           <div style={gridStyle}>
-            <Input placeholder="Startup Name *" value={form.startupName} onChange={onChange("startupName")} />
+            <Input placeholder="Startup Name *" value={form.startupName} onChange={onChange("startupName")} error={validationErrors.startupName} />
             <Input placeholder="Industry Category" value={form.industryCategory} onChange={onChange("industryCategory")} />
             <Input placeholder="Funding Stage" value={form.fundingStage} onChange={onChange("fundingStage")} />
             <Input placeholder="Location" value={form.location} onChange={onChange("location")} />
-            <Input placeholder="Number of Team Members" type="number" value={form.numberOfTeamMembers} onChange={onChange("numberOfTeamMembers")} />
+            <Input placeholder="Number of Team Members" type="number" value={form.numberOfTeamMembers} onChange={onChange("numberOfTeamMembers")} error={validationErrors.numberOfTeamMembers} />
             <Input placeholder="Company Logo URL" value={form.companyLogo} onChange={onChange("companyLogo")} />
           </div>
 
@@ -207,9 +259,32 @@ const Profile: React.FC = () => {
 };
 
 // Reusable Input
-const Input: React.FC<{ placeholder: string; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; disabled?: boolean; type?: string }> = ({ placeholder, value, onChange, disabled, type }) => (
-  <input placeholder={placeholder} style={inputStyle} value={value} onChange={onChange} disabled={disabled} type={type}
-  />
+const Input: React.FC<{
+  placeholder: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  type?: string;
+  error?: string;
+}> = ({ placeholder, value, onChange, disabled, type, error }) => (
+  <div>
+    <input
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      type={type}
+      style={{
+        ...inputStyle,
+        borderColor: error ? '#ef4444' : '#d1d5db'
+      }}
+    />
+    {error && (
+      <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+        {error}
+      </div>
+    )}
+  </div>
 );
 
 // Reusable Select

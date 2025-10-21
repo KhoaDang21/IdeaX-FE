@@ -32,6 +32,9 @@ const ProfileInvestor: React.FC = () => {
         organization: '',
     })
 
+    // Validation errors state
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
     useEffect(() => {
         if (user?.role === 'investor' && user.id) {
             (dispatch(getInvestorProfile(user.id) as any))
@@ -50,9 +53,37 @@ const ProfileInvestor: React.FC = () => {
         })
     }, [user])
 
+    const validateForm = () => {
+        const errors: Record<string, string> = {}
+
+        // Validate required fields
+        if (!form.fullName.trim()) errors.fullName = 'Họ tên không được để trống'
+
+        // Validate phone number (if provided)
+        if (form.phoneNumber && !/^[\+]?[0-9\s\-\(\)]{10,}$/.test(form.phoneNumber)) {
+            errors.phoneNumber = 'Số điện thoại không hợp lệ'
+        }
+
+        // Validate LinkedIn URL (if provided)
+        if (form.linkedInUrl && !form.linkedInUrl.includes('linkedin.com')) {
+            errors.linkedInUrl = 'LinkedIn URL phải là URL hợp lệ'
+        }
+
+        return errors
+    }
+
     const onChange = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const value = (e.target as HTMLInputElement).type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value
         setForm(prev => ({ ...prev, [key]: value }))
+
+        // Clear validation error when user types
+        if (validationErrors[key]) {
+            setValidationErrors(prev => {
+                const copy = { ...prev }
+                delete copy[key]
+                return copy
+            })
+        }
     }
 
     // Immediate toggle for 2FA: call API to persist change for better UX
@@ -70,6 +101,18 @@ const ProfileInvestor: React.FC = () => {
 
     const onSave = () => {
         if (!user?.id) return
+
+        // Validate form
+        const errors = validateForm()
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors)
+            message.error('Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới')
+            return
+        }
+
+        // Clear validation errors if form is valid
+        setValidationErrors({})
+
         message.loading({ content: 'Saving...', key: 'investor-profile', duration: 0 })
             ; (dispatch(updateInvestorProfile({
                 accountId: user.id, profileData: {
@@ -118,14 +161,59 @@ const ProfileInvestor: React.FC = () => {
                     <div style={{ background: '#fff', padding: 18, borderRadius: 12, minHeight: 260 }}>
                         <h3 style={{ marginTop: 0, color: '#27348B' }}>Personal Details</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                            <input placeholder='Full Name' value={form.fullName} onChange={onChange('fullName')} style={inputStyle} />
+                            <div>
+                                <input
+                                    placeholder='Full Name'
+                                    value={form.fullName}
+                                    onChange={onChange('fullName')}
+                                    style={{
+                                        ...inputStyle,
+                                        borderColor: validationErrors.fullName ? '#ef4444' : '#d1d5db'
+                                    }}
+                                />
+                                {validationErrors.fullName && (
+                                    <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                                        {validationErrors.fullName}
+                                    </div>
+                                )}
+                            </div>
                             <input placeholder='Email' value={user?.email || ''} disabled style={{ ...inputStyle, background: '#f3f4f6' }} />
-                            <input placeholder='Phone Number' value={form.phoneNumber} onChange={onChange('phoneNumber')} style={inputStyle} />
+                            <div>
+                                <input
+                                    placeholder='Phone Number'
+                                    value={form.phoneNumber}
+                                    onChange={onChange('phoneNumber')}
+                                    style={{
+                                        ...inputStyle,
+                                        borderColor: validationErrors.phoneNumber ? '#ef4444' : '#d1d5db'
+                                    }}
+                                />
+                                {validationErrors.phoneNumber && (
+                                    <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                                        {validationErrors.phoneNumber}
+                                    </div>
+                                )}
+                            </div>
                             <select value={form.country} onChange={onChange('country')} style={{ ...inputStyle, padding: 10 }}>
                                 <option value=''>Select country</option>
                                 {countryOptions.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
-                            <input placeholder='LinkedIn URL' value={form.linkedInUrl} onChange={onChange('linkedInUrl')} style={inputStyle} />
+                            <div>
+                                <input
+                                    placeholder='LinkedIn URL'
+                                    value={form.linkedInUrl}
+                                    onChange={onChange('linkedInUrl')}
+                                    style={{
+                                        ...inputStyle,
+                                        borderColor: validationErrors.linkedInUrl ? '#ef4444' : '#d1d5db'
+                                    }}
+                                />
+                                {validationErrors.linkedInUrl && (
+                                    <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                                        {validationErrors.linkedInUrl}
+                                    </div>
+                                )}
+                            </div>
                             <input placeholder='Organization' value={form.organization} disabled style={{ ...inputStyle, background: '#f3f4f6' }} />
                         </div>
                     </div>

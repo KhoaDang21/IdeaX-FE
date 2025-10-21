@@ -16,7 +16,6 @@ import type {
   AuthState,
   LoginCredentials,
   LoginResponse,
-  StartupRegisterCredentials,
   InvestorRegisterCredentials,
   User,
   StartupProfileResponse,
@@ -88,18 +87,22 @@ export const loginUser = createAsyncThunk<
 
 export const registerStartup = createAsyncThunk<
   any,
-  StartupRegisterCredentials,
+  FormData,
   { rejectValue: { message: string } }
 >(
   "auth/registerStartup",
   async (
-    data: StartupRegisterCredentials,
+    data: FormData,
     {
       rejectWithValue,
     }: { rejectWithValue: (value: { message: string }) => any }
   ) => {
     try {
-      const response = await api.post(REGISTER_STARTUP_ENDPOINT, data);
+      const response = await api.post(REGISTER_STARTUP_ENDPOINT, data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       return response.data;
     } catch (err: any) {
       const message =
@@ -195,7 +198,7 @@ export const updateInvestorProfile = createAsyncThunk<
 
 export const updateStartupProfile = createAsyncThunk<
   StartupProfileResponse,
-  { accountId: string; profileData: Partial<StartupProfileResponse> },
+  { accountId: string; profileData: FormData },
   { rejectValue: { message: string } }
 >(
   "auth/updateStartupProfile",
@@ -203,7 +206,12 @@ export const updateStartupProfile = createAsyncThunk<
     try {
       const response = await api.put(
         STARTUP_PROFILE_UPDATE_ENDPOINT(accountId),
-        profileData
+        profileData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
       return response.data;
     } catch (err: any) {

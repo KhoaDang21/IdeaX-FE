@@ -50,6 +50,7 @@ const StartupsJoin: FC = () => {
     const [startupName, setStartupName] = useState('')
     const [companyWebsite, setCompanyWebsite] = useState('')
     const [aboutUs, setAboutUs] = useState('')
+    const [companyLogo, setCompanyLogo] = useState<File | null>(null)
     const dispatch = useDispatch();
     // loading not used in this component; omit to avoid unused var
     const navigate = useNavigate();
@@ -57,8 +58,9 @@ const StartupsJoin: FC = () => {
     const [errors, setErrors] = useState<Record<string, string>>({})
 
     const validateEmail = (email: string) => {
-        // Simple email regex
-        return /^\S+@\S+\.\S+$/.test(email);
+        // More comprehensive email regex
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        return emailRegex.test(email);
     };
 
     const validateUrl = (url: string) => {
@@ -70,6 +72,24 @@ const StartupsJoin: FC = () => {
         } catch (_) {
             return false;
         }
+    };
+
+    const validatePassword = (password: string) => {
+        // Password must be at least 8 characters, contain at least one letter and one number
+        if (password.length < 8) return false;
+        const hasLetter = /[a-zA-Z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        return hasLetter && hasNumber;
+    };
+
+    const validateFile = (file: File | null) => {
+        if (!file) return true; // Optional field
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+
+        if (file.size > maxSize) return false;
+        if (!allowedTypes.includes(file.type)) return false;
+        return true;
     };
 
     // Clear a specific field error when user types
@@ -92,33 +112,58 @@ const StartupsJoin: FC = () => {
             companyWebsite: companyWebsite.trim(),
         };
 
+        // Validate required fields
         if (!trimmed.fullName) newErrors.fullName = 'Vui lòng nhập họ tên';
         if (!trimmed.startupName) newErrors.startupName = 'Vui lòng nhập tên công ty';
         if (!trimmed.email) newErrors.email = 'Vui lòng nhập email';
         else if (!validateEmail(trimmed.email)) newErrors.email = 'Email không hợp lệ';
-        if (trimmed.companyWebsite && !validateUrl(trimmed.companyWebsite)) newErrors.companyWebsite = 'Website không hợp lệ';
+
+        // Validate optional fields
+        if (trimmed.companyWebsite && !validateUrl(trimmed.companyWebsite)) {
+            newErrors.companyWebsite = 'Website không hợp lệ (ví dụ: https://example.com)';
+        }
+
+        // Validate password
         if (!password) newErrors.password = 'Vui lòng nhập mật khẩu';
-        else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
+        else if (!validatePassword(password)) {
+            newErrors.password = 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ cái và số';
+        }
+
+        // Validate confirm password
         if (!confirmPassword) newErrors.confirmPassword = 'Vui lòng nhập xác nhận mật khẩu';
         else if (password !== confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
 
+        // Validate file upload
+        if (companyLogo && !validateFile(companyLogo)) {
+            if (companyLogo.size > 2 * 1024 * 1024) {
+                newErrors.companyLogo = 'File logo không được vượt quá 2MB';
+            } else {
+                newErrors.companyLogo = 'Chỉ chấp nhận file ảnh (JPG, PNG, GIF)';
+            }
+        }
+
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
-            message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
+            message.error('Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới');
             return;
         }
         setSubmitting(true);
         message.loading({ content: 'Đang tạo tài khoản...', key: 'register', duration: 0 });
         try {
-            await (dispatch as any)(registerStartup({
-                email: trimmed.email,
-                password,
-                confirmPassword,
-                fullName: trimmed.fullName,
-                startupName: trimmed.startupName,
-                companyWebsite: trimmed.companyWebsite,
-                aboutUs
-            })).unwrap();
+            // Create FormData for multipart/form-data
+            const formData = new FormData();
+            formData.append('email', trimmed.email);
+            formData.append('password', password);
+            formData.append('confirmPassword', confirmPassword);
+            formData.append('fullName', trimmed.fullName);
+            formData.append('startupName', trimmed.startupName);
+            formData.append('companyWebsite', trimmed.companyWebsite);
+            formData.append('aboutUs', aboutUs);
+            if (companyLogo) {
+                formData.append('companyLogo', companyLogo);
+            }
+
+            await (dispatch as any)(registerStartup(formData)).unwrap();
             message.success({ content: 'Tạo tài khoản thành công! Vui lòng đăng nhập.', key: 'register' });
             setTimeout(() => navigate('/login'), 1200);
         } catch (err: any) {
@@ -183,6 +228,51 @@ const StartupsJoin: FC = () => {
                                 <Input label="Company Name *" placeholder="Enter your company name" value={startupName} onChange={onChangeField(setStartupName, 'startupName')} error={errors.startupName} />
                                 <Input label="Email Address *" type="email" placeholder="Enter your email address" value={email} onChange={onChangeField(setEmail, 'email')} error={errors.email} />
                                 <Input label="Website" placeholder="https://yourcompany.com" value={companyWebsite} onChange={onChangeField(setCompanyWebsite, 'companyWebsite')} error={errors.companyWebsite} />
+
+                                {/* Company Logo Upload */}
+                                <div style={{ marginBottom: 14 }}>
+                                    <label
+                                        style={{
+                                            display: 'block',
+                                            color: '#34419A',
+                                            fontWeight: 600,
+                                            fontSize: 13,
+                                            marginBottom: 6,
+                                        }}
+                                    >
+                                        Company Logo
+                                    </label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] || null;
+                                            setCompanyLogo(file);
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #34419A',
+                                            borderRadius: 10,
+                                            outline: 'none',
+                                            color: '#34419A',
+                                            fontSize: 14,
+                                            fontFamily: 'inherit',
+                                            background: '#fff',
+                                        }}
+                                    />
+                                    {companyLogo && (
+                                        <div style={{ marginTop: 8, fontSize: 12, color: '#16a34a' }}>
+                                            Selected: {companyLogo.name}
+                                        </div>
+                                    )}
+                                    {errors.companyLogo && (
+                                        <div style={{ marginTop: 8, fontSize: 12, color: '#ef4444' }}>
+                                            {errors.companyLogo}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div style={{ marginBottom: 14 }}>
                                     <label
                                         style={{

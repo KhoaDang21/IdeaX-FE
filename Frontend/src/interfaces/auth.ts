@@ -41,7 +41,7 @@ export interface StartupRegisterCredentials {
   fullName: string;
   startupName: string;
   companyWebsite?: string;
-  companyLogo?: string;
+  companyLogo?: File | string;
   aboutUs?: string;
 }
 
