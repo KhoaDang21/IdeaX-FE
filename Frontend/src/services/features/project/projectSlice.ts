@@ -1,5 +1,11 @@
 // src/services/features/project/projectSlice.ts
-import { createSlice, createAsyncThunk, isPending, isRejected, type UnknownAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  createAsyncThunk,
+  isPending,
+  isRejected,
+  type UnknownAction,
+} from "@reduxjs/toolkit";
 import { api } from "../../constant/axiosInstance";
 import type { RootState } from "../../../store";
 import type { Project } from "../../../interfaces/project";
@@ -55,7 +61,9 @@ export const createProject = createAsyncThunk<
     });
     return response.data;
   } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to create project");
+    return rejectWithValue(
+      error.response?.data?.message || "Failed to create project"
+    );
   }
 });
 
@@ -72,7 +80,9 @@ export const getProjectById = createAsyncThunk<
     });
     return res.data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to get project");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to get project"
+    );
   }
 });
 
@@ -89,7 +99,9 @@ export const updateProject = createAsyncThunk<
     });
     return res.data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to update project");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to update project"
+    );
   }
 });
 
@@ -106,7 +118,9 @@ export const deleteProject = createAsyncThunk<
     });
     return id;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to delete project");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to delete project"
+    );
   }
 });
 
@@ -118,12 +132,18 @@ export const approveProject = createAsyncThunk<
 >("projects/approve", async (id, { rejectWithValue, getState }) => {
   try {
     const token = getToken(getState);
-    const res = await api.put(`/projects/${id}/approve`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.put(
+      `/projects/${id}/approve`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
     return res.data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to approve project");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to approve project"
+    );
   }
 });
 
@@ -135,12 +155,18 @@ export const rejectProject = createAsyncThunk<
 >("projects/reject", async (id, { rejectWithValue, getState }) => {
   try {
     const token = getToken(getState);
-    const res = await api.put(`/projects/${id}/reject`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.put(
+      `/projects/${id}/reject`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
     return res.data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to reject project");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to reject project"
+    );
   }
 });
 
@@ -157,7 +183,28 @@ export const getMyProjects = createAsyncThunk<
     });
     return res.data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to get my projects");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to get my projects"
+    );
+  }
+});
+
+// GET /projects/all (get all projects for investors)
+export const getAllProjects = createAsyncThunk<
+  Project[],
+  void,
+  { rejectValue: string; state: RootState }
+>("projects/getAll", async (_, { rejectWithValue, getState }) => {
+  try {
+    const token = getToken(getState);
+    const res = await api.get("/projects/all", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to get all projects"
+    );
   }
 });
 
@@ -176,7 +223,9 @@ export const getMilestoneById = createAsyncThunk<
     });
     return res.data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to get milestone");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to get milestone"
+    );
   }
 });
 
@@ -193,7 +242,9 @@ export const updateMilestone = createAsyncThunk<
     });
     return res.data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to update milestone");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to update milestone"
+    );
   }
 });
 
@@ -210,7 +261,9 @@ export const deleteMilestone = createAsyncThunk<
     });
     return id;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to delete milestone");
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to delete milestone"
+    );
   }
 });
 
@@ -219,34 +272,47 @@ export const getMilestonesByProject = createAsyncThunk<
   Milestone[],
   number,
   { rejectValue: string; state: RootState }
->("milestones/getByProject", async (projectId, { rejectWithValue, getState }) => {
-  try {
-    const token = getToken(getState);
-    const res = await api.get(`/api/milestones/project/${projectId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return res.data;
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to get milestones");
+>(
+  "milestones/getByProject",
+  async (projectId, { rejectWithValue, getState }) => {
+    try {
+      const token = getToken(getState);
+      const res = await api.get(`/api/milestones/project/${projectId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to get milestones"
+      );
+    }
   }
-});
+);
 
 // POST /api/milestones/project/{projectId} (unchanged)
 export const createMilestone = createAsyncThunk<
   Milestone,
-  { projectId: number; data: Omit<Milestone, "id" | "createdAt" | "updatedAt"> },
+  {
+    projectId: number;
+    data: Omit<Milestone, "id" | "createdAt" | "updatedAt">;
+  },
   { rejectValue: string; state: RootState }
->("milestones/create", async ({ projectId, data }, { rejectWithValue, getState }) => {
-  try {
-    const token = getToken(getState);
-    const res = await api.post(`/api/milestones/project/${projectId}`, data, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return res.data;
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to create milestone");
+>(
+  "milestones/create",
+  async ({ projectId, data }, { rejectWithValue, getState }) => {
+    try {
+      const token = getToken(getState);
+      const res = await api.post(`/api/milestones/project/${projectId}`, data, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to create milestone"
+      );
+    }
   }
-});
+);
 
 // Define type for rejected action
 interface RejectedAction extends UnknownAction {
@@ -277,6 +343,10 @@ const projectSlice = createSlice({
         state.status = "succeeded";
       })
       .addCase(getMyProjects.fulfilled, (state, action) => {
+        state.projects = action.payload;
+        state.status = "succeeded";
+      })
+      .addCase(getAllProjects.fulfilled, (state, action) => {
         state.projects = action.payload;
         state.status = "succeeded";
       })
@@ -323,7 +393,9 @@ const projectSlice = createSlice({
         if (i !== -1) state.milestones[i] = action.payload;
       })
       .addCase(deleteMilestone.fulfilled, (state, action) => {
-        state.milestones = state.milestones.filter((m) => m.id !== action.payload);
+        state.milestones = state.milestones.filter(
+          (m) => m.id !== action.payload
+        );
       })
       /* ERROR + STATUS */
       .addMatcher(isPending, (state) => {
@@ -333,7 +405,10 @@ const projectSlice = createSlice({
       .addMatcher(isRejected, (state, action) => {
         state.status = "failed";
         const rejectedAction = action as RejectedAction;
-        state.error = rejectedAction.payload || rejectedAction.error?.message || "Something went wrong";
+        state.error =
+          rejectedAction.payload ||
+          rejectedAction.error?.message ||
+          "Something went wrong";
       });
   },
 });

@@ -47,26 +47,65 @@ const InvestorHeader: FC = () => {
     ]
 
     return (
-        <header style={{ background: '#DBEAFE', borderBottom: '1px solid #e5e7eb' }}>
-            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                <Link to="/investor/find-projects" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-                    <img src={logo} alt="IdeaX" style={{ width: 36, height: 36, borderRadius: 8 }} />
-                </Link>
+        <header
+            style={{
+                background: '#DBEAFE',
+                borderBottom: '1px solid #e5e7eb',
+                width: '100%',
+            }}
+        >
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 24px', // có thể tăng/giảm padding để đẹp hơn
+                    width: '100%',
+                }}
+            >
+                {/* Logo bên trái - sát viền */}
+                <div style={{ flexShrink: 0 }}>
+                    <Link
+                        to="/investor/find-projects"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            textDecoration: 'none',
+                        }}
+                    >
+                        <img
+                            src={logo}
+                            alt="IdeaX"
+                            style={{ width: 36, height: 36, borderRadius: 8 }}
+                        />
+                    </Link>
+                </div>
 
-                <nav style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                {/* Menu giữa - căn giữa, không bị xuống hàng */}
+                <nav
+                    style={{
+                        flex: 1,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 40,
+                        whiteSpace: 'nowrap',
+                    }}
+                >
                     {[
                         { to: '/investor/find-projects', label: 'Find Projects' },
                         { to: '/investor/progress-tracking', label: 'Project Tracking' },
                         { to: '/investor/invested-projects', label: 'Invested Projects' },
-                        { to: '/investor/payments', label: 'Payments' }
-                    ].map(link => (
+                        { to: '/investor/payments', label: 'Payments' },
+                    ].map((link) => (
                         <NavLink
                             key={link.to}
                             to={link.to}
                             style={({ isActive }) => ({
                                 color: isActive ? '#27348B' : '#4b5563',
                                 fontWeight: isActive ? 700 : 500,
-                                textDecoration: 'none'
+                                textDecoration: 'none',
                             })}
                         >
                             {link.label}
@@ -74,26 +113,85 @@ const InvestorHeader: FC = () => {
                     ))}
                 </nav>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 18, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                {/* Avatar + thông báo bên phải - sát viền phải */}
+                <div
+                    style={{
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                    }}
+                >
+                    <div
+                        style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            background: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                        }}
+                    >
                         <BellOutlined style={{ fontSize: 18, color: '#111' }} />
                     </div>
 
                     <Dropdown menu={{ items }} trigger={['click']} placement="bottomRight">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 8 }}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                cursor: 'pointer',
+                                padding: '4px 8px',
+                                borderRadius: 8,
+                            }}
+                        >
                             {user?.profilePictureUrl ? (
-                                <img src={user.profilePictureUrl} alt="avatar" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                                <img
+                                    src={user.profilePictureUrl}
+                                    alt="avatar"
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: '50%',
+                                        objectFit: 'cover',
+                                    }}
+                                />
                             ) : (
-                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#34419A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                                    {user?.fullName ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AD'}
+                                <div
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: '50%',
+                                        background: '#34419A',
+                                        color: '#fff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontWeight: 700,
+                                    }}
+                                >
+                                    {user?.fullName
+                                        ? user.fullName
+                                            .split(' ')
+                                            .map((n) => n[0])
+                                            .join('')
+                                            .toUpperCase()
+                                            .slice(0, 2)
+                                        : 'AD'}
                                 </div>
                             )}
-                            <span style={{ color: '#1f2937', fontWeight: 600 }}>{user?.fullName || user?.email || 'Investor'}</span>
+                            <span style={{ color: '#1f2937', fontWeight: 600 }}>
+                                {user?.fullName || user?.email || 'Investor'}
+                            </span>
                         </div>
                     </Dropdown>
                 </div>
             </div>
         </header>
+
     )
 }
 

@@ -1,6 +1,5 @@
 // src/interfaces/project.ts
 export interface Project {
-  files: never[];
   id: number;
   projectName: string;
   category: string;
@@ -13,12 +12,18 @@ export interface Project {
   website?: string;
   description: string;
   status: "DRAFT" | "PUBLISHED" | "APPROVED" | "REJECTED" | "COMPLETE";
-  pitchDeck?: string; // URL from API
-  pitchVideo?: string; // URL from API
-  businessPlan?: string; // URL from API
-  financialProjection?: string; // URL from API
-  investorClicks: number;
-  createdAt: string; // Changed from 'any' to 'string' for type safety
+  adminNote?: string;
+  startupId: number;
+  createdAt: string;
+  updatedAt: string;
+  files?: {
+    fileType: string;
+    fileUrl: string;
+  }[];
+  // Added properties to fix TypeScript errors
+  currentFunding?: number;
+  fundingGoal?: number;
+  companyName?: string;
 }
 
 export interface ProjectFormState {
