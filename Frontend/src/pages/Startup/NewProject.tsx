@@ -1,6 +1,6 @@
 // src/pages/Startup/SubmitNewProject.tsx
 import React, { useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   UploadOutlined,
@@ -16,7 +16,7 @@ import {
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { createProject } from "../../services/features/project/projectSlice";
-import { type AppDispatch, type RootState } from "../../store";
+import { type AppDispatch } from "../../store";
 import { App } from "antd";
 import type { ProjectFormState } from "../../interfaces/project";
 
@@ -58,7 +58,7 @@ const SubmitNewProject: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const token = useSelector((state: RootState) => state.auth?.token);
+
 
   // Form state using ProjectFormState
   const [formData, setFormData] = useState<ProjectFormState>({
@@ -246,7 +246,7 @@ const SubmitNewProject: React.FC = () => {
     if (formData.customCategory) submitData.append("customCategory", formData.customCategory.trim());
     submitData.append("fundingStage", formData.fundingStage);
     submitData.append("fundingRange", formData.fundingRange);
-    submitData.append("teamSize", formData.teamSize);
+    submitData.append("teamSize", formData.teamSize.toString());
     submitData.append("location", formData.location.trim());
     submitData.append("website", formData.website!.trim());
     submitData.append("description", formData.description.trim());
@@ -261,7 +261,7 @@ const SubmitNewProject: React.FC = () => {
 
     dispatch(createProject(submitData))
       .unwrap()
-      .then((result) => {
+      .then(() => {
         message.success({ content: 'Project created successfully!', key: 'createProject' });
         navigate("/startup/my-projects");
       })

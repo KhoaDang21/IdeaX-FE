@@ -97,6 +97,7 @@ const InvestorHeader: FC = () => {
                         { to: '/investor/find-projects', label: 'Find Projects' },
                         { to: '/investor/progress-tracking', label: 'Project Tracking' },
                         { to: '/investor/invested-projects', label: 'Invested Projects' },
+                        { to: '/investor/room', label: 'Roomeet' },
                         { to: '/investor/payments', label: 'Payments' },
                     ].map((link) => (
                         <NavLink
