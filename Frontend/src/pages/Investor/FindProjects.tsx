@@ -1,592 +1,586 @@
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { getAllProjects } from '../../services/features/project/projectSlice';
-import type { RootState, AppDispatch } from '../../store';
-import type { Project } from '../../interfaces/project';
-import { Card, Button, Tag, Progress, Typography, Row, Col, Modal, Select, Space } from 'antd';
-import { EyeOutlined, FilterOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { getAllProjects } from "../../services/features/project/projectSlice";
+import { createMeeting } from "../../services/features/meeting/meetingSlice";
+import type { RootState, AppDispatch } from "../../store";
+import type { Project } from "../../interfaces/project";
+import type { MeetingFormData } from "../../interfaces/meeting";
+import {
+    Card,
+    Button,
+    Tag,
+    Progress,
+    Typography,
+    Row,
+    Col,
+    Modal,
+    Select,
+    Form,
+    DatePicker,
+    Input,
+    Space,
+    message,
+    Spin,
+    Empty,
+    Divider
+} from "antd";
+import {
+    EyeOutlined,
+    FilterOutlined,
+    VideoCameraOutlined,
+    DollarOutlined,
+    TeamOutlined,
+    CalendarOutlined,
+    EnvironmentOutlined,
+    RocketOutlined
+} from "@ant-design/icons";
+import "./investor.css";
+import { useNavigate } from "react-router-dom";
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 const FindProjects: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
-    const { projects, status, error } = useSelector((state: RootState) => state.project);
-    const [filter, setFilter] = useState('all');
-    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-    const [detailVisible, setDetailVisible] = useState<boolean>(false);
+    const navigate = useNavigate();
+    const { projects, status, error } = useSelector((s: RootState) => s.project);
+    const authUser = useSelector((s: RootState) => s.auth.user);
+
+    const [filter, setFilter] = useState("all");
+    const [selected, setSelected] = useState<Project | null>(null);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [showMeetingForm, setShowMeetingForm] = useState(false);
+    const [form] = Form.useForm<MeetingFormData>();
 
     useEffect(() => {
         dispatch(getAllProjects());
     }, [dispatch]);
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount);
+    const handleOpen = (p: Project) => {
+        setSelected(p);
+        setModalOpen(true);
     };
 
-    const getCategoryTagColor = (category: string) => {
-        const colors: { [key: string]: string } = {
-            'AI': 'purple',
-            'AI_ML': 'purple',
-            'WEB3': 'geekblue',
-            'CLEANTECH': 'green',
-            'GREEN_TECH': 'green',
-            'EDTECH': 'orange',
-            'EDUCATION': 'orange',
-            'HEALTHTECH': 'red',
-            'HEALTHCARE': 'red',
-            'IOT': 'cyan',
-            'FINTECH': 'blue',
-            'ENERGY': 'volcano',
-            'MOBILE': 'magenta',
-            'HARDWARE': 'gray',
-            'ENTERPRISE': 'purple',
-            'ECOMMERCE': 'pink',
-            'BLOCKCHAIN': 'geekblue',
-            'AGRICULTURE': 'lime',
-        };
-        return colors[category] || 'default';
-    };
+    const handleCreateRoom = async () => {
+        if (!authUser) {
+            message.error("Vui lòng đăng nhập trước khi tạo room");
+            return;
+        }
+        if (!selected) return;
 
-    const formatFundingStage = (stage: string) => {
-        if (!stage) return 'Unknown';
-        return stage.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-    };
+        try {
+            const values = await form.validateFields();
+            const meetingTime = values.meetingTime;
 
-    const filteredProjects = filter === 'all'
-        ? projects
-        : projects.filter(project => project.category === filter);
-
-    const categories = ['all', ...Array.from(new Set(projects.map(p => p.category)))];
-
-    // Get funding data based on fundingRange from the project - FIXED LOGIC
-    const getFundingData = (project: Project) => {
-        // If project has actual funding data, use it
-        if (project.currentFunding !== undefined && project.fundingGoal !== undefined) {
-            return {
-                current: project.currentFunding,
-                goal: project.fundingGoal
+            const payload = {
+                ...values,
+                meetingTime: meetingTime.format('YYYY-MM-DD HH:mm:00'),
+                startTime: meetingTime.format('YYYY-MM-DD HH:mm:00'),
+                endTime: meetingTime.clone().add(1, 'hour').format('YYYY-MM-DD HH:mm:00'),
+                createdById: Number(authUser.id),
+                roomCode: `ROOM-${Date.now()}` // Will be overwritten by BE
             };
+
+            await dispatch(createMeeting(payload)).unwrap();
+            message.success("Tạo room thành công");
+            setShowMeetingForm(false);
+            setModalOpen(false);
+            form.resetFields();
+            navigate("/investor/room");
+        } catch (err: any) {
+            if (err.errorFields) {
+                message.error("Vui lòng điền đầy đủ thông tin");
+            } else {
+                message.error(err?.message || "Tạo room thất bại");
+            }
         }
+    };
 
-        // Define realistic funding ranges based on funding stage and range
-        const fundingRanges: { [key: string]: { current: number, goal: number } } = {
-            'UNDER_50K': { current: 25000, goal: 50000 },
-            'FROM_50K_TO_200K': { current: 100000, goal: 200000 },
-            'FROM_200K_TO_1M': { current: 500000, goal: 1000000 },
-            'OVER_1M': { current: 750000, goal: 2000000 }, // Realistic for Series A
-        };
+    const categories = ["all", ...Array.from(new Set(projects.map((p) => p.category)))];
 
-        // Use the project's fundingRange if available
-        const rangeData = fundingRanges[project.fundingRange] || { current: 225000, goal: 750000 };
+    const filtered = filter === "all" ? projects : projects.filter((p) => p.category === filter);
 
-        // Adjust based on funding stage for more realism
-        if (project.fundingStage === 'SEED') {
-            return { current: Math.round(rangeData.current * 0.3), goal: Math.round(rangeData.goal * 0.5) };
-        } else if (project.fundingStage === 'SERIES_B') {
-            return { current: Math.round(rangeData.current * 2), goal: Math.round(rangeData.goal * 3) };
-        } else if (project.fundingStage === 'SERIES_C') {
-            return { current: Math.round(rangeData.current * 5), goal: Math.round(rangeData.goal * 8) };
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "APPROVED": return "green";
+            case "PENDING": return "orange";
+            case "REJECTED": return "red";
+            default: return "blue";
         }
-
-        return rangeData;
     };
 
-    // Get company name - FIXED: Use project data first
-    const getCompanyName = (project: Project) => {
-        // If project has company name, use it
-        if (project.companyName) return project.companyName;
-
-        const companyNames: { [key: string]: string } = {
-            'AI': 'TechStart Inc.',
-            'AI_ML': 'TechStart Inc.',
-            'CLEANTECH': 'EcoTech Corp',
-            'GREEN_TECH': 'EcoTech Corp',
-            'HEALTHTECH': 'MedInnovate',
-            'HEALTHCARE': 'MedInnovate',
-            'EDTECH': 'EduNext Solutions',
-            'EDUCATION': 'EduNext Solutions',
-            'WEB3': 'CryptoFlow Systems',
-            'IOT': 'ConnectHome Tech',
-            'FINTECH': 'FinTech Solutions',
-            'ECOMMERCE': 'ShopNext',
-            'BLOCKCHAIN': 'BlockChain Innovations',
-            'AGRICULTURE': 'AgriTech Solutions',
-            'ENTERPRISE': 'Enterprise Solutions Inc.',
-        };
-        return companyNames[project.category] || `${project.projectName} Inc.` || 'Tech Company';
+    const getCategoryColor = (category: string) => {
+        const colors = ["magenta", "purple", "cyan", "blue", "geekblue", "volcano"];
+        const index = Math.abs(category.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length;
+        return colors[index];
     };
 
-    // Get description - FIXED: Use project description first
-    const getProjectDescription = (project: Project) => {
-        if (project.description && project.description.trim().length > 0) {
-            return project.description;
-        }
-
-        const descriptions: { [key: string]: string } = {
-            'AI': 'Revolutionary analytics platform using machine learning to provide real-time business insights and predictive analytics for enterprise clients.',
-            'AI_ML': 'Revolutionary analytics platform using machine learning to provide real-time business insights and predictive analytics for enterprise clients.',
-            'WEB3': 'Next-generation payment processing platform with blockchain integration and smart contract automation.',
-            'CLEANTECH': 'Sustainable energy solutions for urban environments using advanced solar and wind integration technologies.',
-            'GREEN_TECH': 'Sustainable energy solutions for urban environments using advanced solar and wind integration technologies.',
-            'EDTECH': 'Personalized learning platform using adaptive AI to customize educational content for individual student needs.',
-            'EDUCATION': 'Personalized learning platform using adaptive AI to customize educational content for individual student needs.',
-            'HEALTHTECH': 'Mobile health monitoring app with AI-driven diagnostics and telemedicine features for remote patient care.',
-            'HEALTHCARE': 'Mobile health monitoring app with AI-driven diagnostics and telemedicine features for remote patient care.',
-            'IOT': 'Comprehensive smart home automation system with advanced IoT integration and voice control capabilities.',
-            'FINTECH': 'Innovative financial technology solutions for modern banking and payment systems.',
-            'ECOMMERCE': 'Next-generation e-commerce platform with AI-powered recommendations and seamless user experience.',
-            'BLOCKCHAIN': 'Decentralized solutions leveraging blockchain technology for secure and transparent transactions.',
-            'AGRICULTURE': 'Advanced agricultural technology solutions for sustainable farming and food production.',
-            'ENTERPRISE': 'Enterprise-grade solutions for business transformation and digital innovation.',
-        };
-        return descriptions[project.category] || 'Innovative solution transforming the industry with cutting-edge technology and sustainable practices.';
-    };
-
-    // Safe number conversion for team size
-    const getTeamSize = (project: Project): number => {
-        if (project.teamSize) {
-            const size = parseInt(project.teamSize.toString());
-            return isNaN(size) ? 8 : Math.max(1, size);
-        }
-        return 8;
-    };
-
-    // Safe URL handling
-    const getWebsiteUrl = (project: Project): string => {
-        if (project.website) {
-            return project.website.startsWith('http') ? project.website : `https://${project.website}`;
-        }
-        return '#';
-    };
-
-    // Format category for display
-    const formatCategory = (category: string): string => {
-        if (!category) return 'Other';
-        return category.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-    };
-
-    if (status === 'loading') {
+    if (status === "loading") {
         return (
-            <div className="flex flex-col justify-center items-center min-h-screen bg-gray-50">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600 mb-4"></div>
-                <p className="text-gray-600 font-medium">Loading projects...</p>
+            <div style={{
+                minHeight: "60vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: 'column',
+                gap: 16
+            }}>
+                <Spin size="large" />
+                <Text type="secondary">Loading investment opportunities...</Text>
             </div>
         );
     }
 
-    if (status === 'failed') {
+    if (status === "failed") {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-6">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md w-full">
-                    <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h2 className="text-2xl font-bold text-red-700 mb-3 text-center">Error Loading Projects</h2>
-                    <p className="text-gray-700 text-center mb-6">{error || "There was a problem loading projects. Please try again later."}</p>
-                    <button
-                        onClick={() => dispatch(getAllProjects())}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                        Try Again
-                    </button>
-                </div>
+            <div style={{
+                padding: 24,
+                textAlign: 'center',
+                minHeight: '60vh',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
+            }}>
+                <Title level={3} type="danger">Error loading projects</Title>
+                <Text type="secondary" style={{ marginBottom: 16 }}>{error}</Text>
+                <Button type="primary" onClick={() => dispatch(getAllProjects())}>
+                    Try Again
+                </Button>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 py-6">
-            <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header with Filter and Count */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 w-full">
-                    {/* Left side */}
-                    <div className="flex-1">
-                        <h1 className="text-3xl font-bold mb-2" style={{ color: '#34419A' }}>
-                            Discover Investment Opportunities
-                        </h1>
-                        <p className="text-lg text-gray-600 max-w-3xl">
-                            Browse and connect with innovative startups seeking funding across various industries
-                        </p>
-                    </div>
-
-                    {/* Right side */}
-                    <div className="flex flex-col md:items-end items-start gap-2 md:ml-auto">
-                        <div className="flex items-center gap-3 w-full md:w-auto justify-start md:justify-end">
-                            <FilterOutlined className="text-gray-500 text-lg" />
+        <div style={{
+            padding: 24,
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+            minHeight: '100vh'
+        }}>
+            {/* Header Section */}
+            <div style={{
+                background: 'white',
+                padding: '32px 24px',
+                borderRadius: 16,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                marginBottom: 32
+            }}>
+                <Row gutter={[24, 24]} align="middle">
+                    <Col xs={24} md={12}>
+                        <Space direction="vertical" size={8}>
+                            <Title level={2} style={{
+                                margin: 0,
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent'
+                            }}>
+                                Discover Investment Opportunities
+                            </Title>
+                            <Text type="secondary" style={{ fontSize: 16 }}>
+                                Browse innovative startups seeking funding and partnership
+                            </Text>
+                        </Space>
+                    </Col>
+                    <Col xs={24} md={12}>
+                        <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            justifyContent: 'flex-end'
+                        }}>
+                            <FilterOutlined style={{ fontSize: 20, color: '#667eea' }} />
                             <Select
                                 value={filter}
-                                onChange={setFilter}
-                                style={{ width: 200 }}
+                                onChange={(v) => setFilter(String(v))}
+                                style={{ width: 240 }}
                                 size="large"
-                                placeholder="Filter by category"
-                                className="filter-select"
+                                suffixIcon={<RocketOutlined />}
                             >
-                                <Option value="all">All Categories</Option>
-                                {categories.filter(cat => cat !== 'all').map((category) => (
-                                    <Option key={category} value={category}>
-                                        {formatCategory(category)}
+                                {categories.map((c) => (
+                                    <Option key={c} value={c}>
+                                        {c === "all" ? "All Categories" : c.replace(/_/g, " ")}
                                     </Option>
                                 ))}
                             </Select>
                         </div>
+                    </Col>
+                </Row>
+            </div>
 
-                        <Text className="text-gray-600 text-sm md:text-right">
-                            Showing <span className="font-semibold">{filteredProjects.length}</span> projects
-                            {filter !== 'all' && (
-                                <span> in <span className="font-semibold">{formatCategory(filter)}</span></span>
-                            )}
-                        </Text>
-                    </div>
+            {/* Projects Grid */}
+            {filtered.length === 0 ? (
+                <div style={{
+                    background: 'white',
+                    padding: 48,
+                    borderRadius: 16,
+                    textAlign: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}>
+                    <Empty
+                        description={
+                            <Space direction="vertical">
+                                <Text strong>No projects found</Text>
+                                <Text type="secondary">Try selecting a different category</Text>
+                            </Space>
+                        }
+                    />
                 </div>
-
-                {/* Projects Grid */}
-                <Row gutter={[20, 20]}>
-                    {filteredProjects.map((project: Project) => {
-                        const fundingData = getFundingData(project);
-                        const progressPercentage = Math.min(100, (fundingData.current / fundingData.goal) * 100);
-                        const companyName = getCompanyName(project);
-                        const description = getProjectDescription(project);
-                        const teamSize = getTeamSize(project);
+            ) : (
+                <Row gutter={[24, 24]}>
+                    {filtered.map((p) => {
+                        const fundingReceived = (p as any).fundingReceived ?? 0;
+                        const fundingGoal = p.fundingAmount ?? ((p as any).minimumInvestment ? (p as any).minimumInvestment * 10 : 500000);
+                        const percent = fundingGoal > 0 ? Math.round((Number(fundingReceived) / Number(fundingGoal)) * 100) : 0;
 
                         return (
-                            <Col xs={24} sm={12} md={12} lg={8} key={project.id}>
+                            <Col xs={24} sm={12} lg={8} xl={6} key={p.id}>
                                 <Card
                                     hoverable
-                                    className="h-full rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white border border-[#E2E8F0]"
+                                    className="project-card"
+                                    style={{
+                                        height: '100%',
+                                        borderRadius: 16,
+                                        overflow: 'hidden',
+                                        border: 'none',
+                                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                                        transition: 'all 0.3s ease'
+                                    }}
                                     bodyStyle={{
+                                        padding: 20,
+                                        height: '100%',
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        padding: '20px',
-                                        width: '100%',
+                                        flexDirection: 'column'
                                     }}
                                 >
-                                    {/* Card Content */}
-                                    <div className="flex flex-col h-full space-y-4">
-                                        {/* Project Header */}
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="flex-1">
-                                                    <Title level={4} className="m-0 text-gray-900 line-clamp-2 flex-1 text-lg leading-snug">
-                                                        {project.projectName || 'Unnamed Project'}
-                                                    </Title>
-                                                    <Text type="secondary" className="text-sm font-medium block text-gray-600 mt-1">
-                                                        {companyName}
-                                                    </Text>
-                                                </div>
-
-                                                <div className="flex flex-col items-end gap-2">
-                                                    <Tag color={project.status === 'APPROVED' ? 'green' : 'gold'} className="text-xs px-3 py-1 font-medium">
-                                                        {project.status === 'APPROVED' ? 'Open Access' : 'NDA Required'}
-                                                    </Tag>
-                                                    <Tag
-                                                        color={getCategoryTagColor(project.category)}
-                                                        className="flex-shrink-0 text-xs px-3 py-1 font-medium"
-                                                    >
-                                                        {formatCategory(project.category)}
-                                                    </Tag>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Description */}
-                                        <Paragraph
-                                            ellipsis={{ rows: 3 }}
-                                            className="text-gray-600 flex-grow leading-relaxed text-sm mt-2 mb-2"
-                                        >
-                                            {description}
-                                        </Paragraph>
-
-                                        {/* Funding Stage Tag */}
-                                        <div className="mt-1 mb-2">
-                                            <Tag color="blue" className="text-xs px-3 py-1 font-medium">
-                                                {project.fundingStage ? formatFundingStage(project.fundingStage) : 'Seed'} Stage
-                                            </Tag>
-                                        </div>
-
-                                        {/* Funding & Info Section - Two Columns Layout */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4 w-full bg-gray-50 rounded-lg border border-gray-200 p-5">
-                                            {/* Left: Funding Progress */}
-                                            <div className="flex flex-col w-full">
-                                                {/* Sửa đoạn này */}
-                                                <div className="flex justify-between items-center mb-2 w-full px-2">
-                                                    <Text
-                                                        type="secondary"
-                                                        className="text-sm font-medium text-gray-500 tracking-wide whitespace-nowrap"
-                                                        style={{ paddingRight: '16px' }}
-                                                    >
-                                                        Funding Progress
-                                                    </Text>
-                                                    <Text
-                                                        strong
-                                                        className="text-sm text-indigo-700 whitespace-nowrap"
-                                                        style={{ paddingLeft: '16px' }}
-                                                    >
-                                                        {formatCurrency(fundingData.current)} / {formatCurrency(fundingData.goal)}
-                                                    </Text>
-                                                </div>
-
-                                                <Progress
-                                                    percent={Math.round(progressPercentage)}
-                                                    status="active"
-                                                    strokeColor={{
-                                                        '0%': '#3b82f6',
-                                                        '100%': '#10b981',
-                                                    }}
-                                                    showInfo={false}
-                                                    strokeWidth={10}
-                                                />
-
-                                                <Text
-                                                    type="secondary"
-                                                    className="text-xs text-gray-500 block mt-2 text-center"
-                                                >
-                                                    {Math.round(progressPercentage)}% funded
+                                    <div style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: 'flex-start',
+                                        marginBottom: 16
+                                    }}>
+                                        <Space direction="vertical" size={4} style={{ flex: 1 }}>
+                                            <Title level={4} style={{
+                                                margin: 0,
+                                                color: '#1a1a1a'
+                                            }}>
+                                                {p.projectName}
+                                            </Title>
+                                            <Space size={4}>
+                                                <EnvironmentOutlined style={{ color: '#666', fontSize: 12 }} />
+                                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                                    {p.location || "Unknown"}
                                                 </Text>
-                                            </div>
-
-                                            {/* Right: Project Quick Info */}
-                                            <div className="flex flex-col justify-start text-sm text-gray-700 text-left space-y-[55px]">
-                                                <div>
-                                                    <Text strong className="block text-gray-800">Stage:</Text>
-                                                    <Text>{formatFundingStage(project.fundingStage) || 'Seed'}</Text>
-                                                </div>
-                                                <div>
-                                                    <Text strong className="block text-gray-800">Team:</Text>
-                                                    <Text>{teamSize} members</Text>
-                                                </div>
-                                                <div>
-                                                    <Text strong className="block text-gray-800">Status: </Text>
-                                                    <Tag color={project.status === 'APPROVED' ? 'green' : 'orange'}>
-                                                        {project.status === 'APPROVED' ? 'Approved' : 'Pending'}
-                                                    </Tag>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* View Details Button */}
-                                        <Button
-                                            type="primary"
-                                            block
-                                            icon={<EyeOutlined />}
-                                            onClick={() => {
-                                                setSelectedProject(project);
-                                                setDetailVisible(true);
-                                            }}
-                                            className="mt-auto"
-                                            size="middle"
-                                            style={{
-                                                height: '40px',
-                                                borderRadius: '6px',
-                                                fontSize: '14px',
-                                                fontWeight: '500',
-                                                marginTop: '20px',
-                                            }}
-                                        >
-                                            View Details
-                                        </Button>
+                                            </Space>
+                                        </Space>
+                                        <Space direction="vertical" align="end" size={8}>
+                                            <Tag
+                                                color={getStatusColor(p.status)}
+                                                style={{
+                                                    margin: 0,
+                                                    fontWeight: 600,
+                                                    borderRadius: 12
+                                                }}
+                                            >
+                                                {p.status}
+                                            </Tag>
+                                            <Tag
+                                                color={getCategoryColor(p.category)}
+                                                style={{
+                                                    borderRadius: 12,
+                                                    margin: 0
+                                                }}
+                                            >
+                                                {p.category}
+                                            </Tag>
+                                        </Space>
                                     </div>
+
+                                    <Paragraph
+                                        ellipsis={{ rows: 3 }}
+                                        style={{
+                                            marginBottom: 20,
+                                            color: '#666',
+                                            lineHeight: 1.6,
+                                            flex: 1
+                                        }}
+                                    >
+                                        {p.description || "No description provided"}
+                                    </Paragraph>
+
+                                    {/* Funding Progress */}
+                                    <div style={{ marginBottom: 20 }}>
+                                        <div style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            marginBottom: 8,
+                                            alignItems: 'center'
+                                        }}>
+                                            <Space size={4}>
+                                                <DollarOutlined style={{ color: '#52c41a' }} />
+                                                <Text strong style={{ color: '#52c41a' }}>
+                                                    {new Intl.NumberFormat("en-US", {
+                                                        style: "currency",
+                                                        currency: "USD",
+                                                        maximumFractionDigits: 0
+                                                    }).format(Number(fundingReceived))}
+                                                </Text>
+                                            </Space>
+                                            <Text type="secondary">
+                                                Goal: {new Intl.NumberFormat("en-US", {
+                                                    style: "currency",
+                                                    currency: "USD",
+                                                    maximumFractionDigits: 0
+                                                }).format(Number(fundingGoal))}
+                                            </Text>
+                                        </div>
+                                        <Progress
+                                            percent={Math.max(0, Math.min(100, percent))}
+                                            showInfo
+                                            strokeColor={{
+                                                '0%': '#108ee9',
+                                                '100%': '#87d068',
+                                            }}
+                                            trailColor="#f0f0f0"
+                                        />
+                                    </div>
+
+                                    <Button
+                                        type="primary"
+                                        block
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpen(p);
+                                        }}
+                                        icon={<EyeOutlined />}
+                                        style={{
+                                            borderRadius: 8,
+                                            height: 40,
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        View Details
+                                    </Button>
                                 </Card>
                             </Col>
                         );
                     })}
                 </Row>
-
-                {/* Empty State */}
-                {filteredProjects.length === 0 && (
-                    <div className="flex justify-center mt-12">
-                        <Card
-                            className="text-center border border-gray-200 shadow-sm max-w-md w-full rounded-lg bg-white"
-                            bodyStyle={{ padding: '40px 24px' }}
-                        >
-                            <div className="text-5xl text-gray-300 mb-4">
-                                <svg width="60" height="60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                            </div>
-                            <Title level={4} className="text-gray-700 mb-3">No Projects Available</Title>
-                            <Paragraph className="text-gray-500 mb-6 text-sm">
-                                {filter !== 'all'
-                                    ? `No ${formatCategory(filter)} projects found. Try a different category.`
-                                    : 'No investment opportunities available right now.'}
-                            </Paragraph>
-                            {filter !== 'all' && (
-                                <Button
-                                    type="primary"
-                                    onClick={() => setFilter('all')}
-                                    size="middle"
-                                    style={{
-                                        borderRadius: '6px',
-                                        height: '40px',
-                                        fontSize: '14px',
-                                        fontWeight: '500'
-                                    }}
-                                >
-                                    View All Projects
-                                </Button>
-                            )}
-                        </Card>
-                    </div>
-                )}
-            </div>
+            )}
 
             {/* Project Detail Modal */}
             <Modal
+                open={modalOpen}
+                onCancel={() => setModalOpen(false)}
                 title={null}
-                open={detailVisible}
-                onCancel={() => setDetailVisible(false)}
                 footer={null}
                 width={800}
-                bodyStyle={{ padding: 0 }}
                 centered
                 className="project-detail-modal"
+                styles={{
+                    body: { padding: 0 }
+                }}
             >
-                {selectedProject && (
-                    <div className="rounded-lg overflow-hidden">
-                        {/* Header Section */}
-                        <div className="bg-gradient-to-r from-blue-50 to-gray-50 px-8 py-6 border-b border-gray-200">
-                            <div className="flex justify-between items-start gap-4">
-                                <div className="flex-1">
-                                    <Title level={3} className="m-0 text-gray-900 mb-2 leading-tight">
-                                        {selectedProject.projectName || 'Unnamed Project'}
-                                    </Title>
-                                    <Text type="secondary" className="text-lg font-medium block text-gray-600">
-                                        {getCompanyName(selectedProject)}
-                                    </Text>
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                    <Tag color={selectedProject.status === 'APPROVED' ? 'green' : 'orange'} className="m-0 text-xs px-3 py-1 font-medium">
-                                        {selectedProject.status === 'APPROVED' ? 'Open Access' : 'NDA Required'}
-                                    </Tag>
-                                    <Tag color={getCategoryTagColor(selectedProject.category)} className="m-0 text-xs px-3 py-1 font-medium">
-                                        {formatCategory(selectedProject.category)}
-                                    </Tag>
-                                </div>
-                            </div>
+                {selected && (
+                    <div style={{ background: 'white', borderRadius: 16 }}>
+                        {/* Header */}
+                        <div style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            padding: '32px 24px',
+                            color: 'white'
+                        }}>
+                            <Title level={2} style={{ color: 'white', margin: 0 }}>
+                                {selected.projectName}
+                            </Title>
+                            <Space size={16} style={{ marginTop: 8 }}>
+                                <Space size={4}>
+                                    <EnvironmentOutlined />
+                                    <Text style={{ color: 'white' }}>{selected.location || "Unknown"}</Text>
+                                </Space>
+                                <Tag color="white" style={{ color: '#667eea', fontWeight: 600 }}>
+                                    {selected.category}
+                                </Tag>
+                                <Tag color="white" style={{ color: getStatusColor(selected.status), fontWeight: 600 }}>
+                                    {selected.status}
+                                </Tag>
+                            </Space>
                         </div>
 
-                        {/* Content Section */}
-                        <div className="p-8">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                {/* Main Content */}
-                                <div className="lg:col-span-2 space-y-6">
-                                    {/* Description */}
-                                    <div>
-                                        <Title level={4} className="text-gray-900 mb-4 text-base">Project Description</Title>
-                                        <Paragraph className="text-gray-700 text-sm leading-relaxed">
-                                            {getProjectDescription(selectedProject)}
-                                        </Paragraph>
-                                    </div>
-
-                                    {/* Funding Progress */}
-                                    <div>
-                                        <Title level={4} className="text-gray-900 mb-4 text-base">Funding Progress  </Title>
-                                        <Card
-                                            size="small"
-                                            bordered={false}
-                                            className="bg-gray-50 border-0 rounded-lg"
-                                            bodyStyle={{ padding: '20px' }}
-                                        >
-                                            <div className="flex justify-between items-center mb-3">
-                                                <Text strong className="text-sm">Funding Goal</Text>
-                                                <Text strong className="text-sm">
-                                                    {formatCurrency(getFundingData(selectedProject).current)} / {formatCurrency(getFundingData(selectedProject).goal)}
-                                                </Text>
-                                            </div>
-                                            <Progress
-                                                percent={Math.round((getFundingData(selectedProject).current / getFundingData(selectedProject).goal) * 100)}
-                                                status="active"
-                                                strokeColor={{
-                                                    '0%': '#3b82f6',
-                                                    '100%': '#10b981',
-                                                }}
-                                                className="mb-3"
-                                            />
-                                            <div className="text-center">
-                                                <Text type="secondary" className="text-xs">
-                                                    {selectedProject.fundingStage ? formatFundingStage(selectedProject.fundingStage) : 'Seed Round'} • {Math.round((getFundingData(selectedProject).current / getFundingData(selectedProject).goal) * 100)}% funded
-                                                </Text>
-                                            </div>
-                                        </Card>
-                                    </div>
+                        {/* Content */}
+                        <div style={{ padding: 24 }}>
+                            <Space direction="vertical" size={24} style={{ width: '100%' }}>
+                                <div>
+                                    <Title level={4}>About the Project</Title>
+                                    <Paragraph style={{
+                                        fontSize: 16,
+                                        lineHeight: 1.7,
+                                        color: '#333'
+                                    }}>
+                                        {selected.description || "No description provided."}
+                                    </Paragraph>
                                 </div>
 
-                                {/* Sidebar - Project Details */}
-                                <div className="space-y-6">
-                                    <Card
-                                        size="small"
-                                        bordered={false}
-                                        className="bg-blue-50 border-0 rounded-lg"
-                                        bodyStyle={{ padding: '20px' }}
-                                    >
-                                        <Title level={4} className="text-gray-900 mb-4 text-base">Project Details</Title>
-                                        <Space direction="vertical" size="middle" className="w-full">
-                                            <div className="flex justify-between items-center">
-                                                <Text type="secondary" className="text-xs">Team Size: </Text>
-                                                <Text strong className="text-xs">{getTeamSize(selectedProject)} members</Text>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <Text type="secondary" className="text-xs">Funding Stage: </Text>
-                                                <Text strong className="text-xs">{formatFundingStage(selectedProject.fundingStage) || 'Seed'}</Text>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <Text type="secondary" className="text-xs">Location: </Text>
-                                                <Text strong className="text-xs">{selectedProject.location || 'Not specified'}</Text>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <Text type="secondary" className="text-xs">Website: </Text>
-                                                <a
-                                                    href={getWebsiteUrl(selectedProject)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:text-blue-800 font-medium text-xs"
-                                                >
-                                                    Visit Website
-                                                </a>
-                                            </div>
-                                        </Space>
-                                    </Card>
+                                <Divider />
 
-                                    {/* Contact Information */}
-                                    <Card
-                                        size="small"
-                                        bordered={false}
-                                        className="bg-green-50 border-0 rounded-lg"
-                                        bodyStyle={{
-                                            padding: '28px 24px'
+                                <Row gutter={32}>
+                                    <Col xs={24} sm={12} lg={8}>
+                                        <Space direction="vertical" size={8} align="center" style={{ textAlign: 'center' }}>
+                                            <DollarOutlined style={{ fontSize: 32, color: '#52c41a' }} />
+                                            <Title level={5} style={{ margin: 0 }}>Funding Goal</Title>
+                                            <Text strong style={{ fontSize: 18 }}>
+                                                {selected.fundingAmount ? new Intl.NumberFormat('en-US', {
+                                                    style: 'currency',
+                                                    currency: 'USD',
+                                                    maximumFractionDigits: 0
+                                                }).format(selected.fundingAmount) : 'Not specified'}
+                                            </Text>
+                                        </Space>
+                                    </Col>
+                                    <Col xs={24} sm={12} lg={8}>
+                                        <Space direction="vertical" size={8} align="center" style={{ textAlign: 'center' }}>
+                                            <TeamOutlined style={{ fontSize: 32, color: '#1890ff' }} />
+                                            <Title level={5} style={{ margin: 0 }}>Team Size</Title>
+                                            <Text strong style={{ fontSize: 18 }}>
+                                                {selected.teamSize || 1} members
+                                            </Text>
+                                        </Space>
+                                    </Col>
+                                    <Col xs={24} sm={12} lg={8}>
+                                        <Space direction="vertical" size={8} align="center" style={{ textAlign: 'center' }}>
+                                            <CalendarOutlined style={{ fontSize: 32, color: '#fa8c16' }} />
+                                            <Title level={5} style={{ margin: 0 }}>Funding Stage</Title>
+                                            <Text strong style={{ fontSize: 18 }}>
+                                                {selected.fundingStage || 'Not specified'}
+                                            </Text>
+                                        </Space>
+                                    </Col>
+                                </Row>
+
+                                <div style={{
+                                    textAlign: 'center',
+                                    paddingTop: 24,
+                                    borderTop: '1px solid #f0f0f0'
+                                }}>
+                                    <Button
+                                        type="primary"
+                                        size="large"
+                                        icon={<VideoCameraOutlined />}
+                                        onClick={() => setShowMeetingForm(true)}
+                                        style={{
+                                            height: 48,
+                                            padding: '0 32px',
+                                            fontSize: 16,
+                                            fontWeight: 600,
+                                            borderRadius: 8,
+                                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                            border: 'none'
                                         }}
                                     >
-                                        <Title level={4} className="text-gray-900 mb-4 text-base">Get Involved</Title>
-                                        <Paragraph className="text-gray-700 mb-4 text-sm leading-relaxed">
-                                            Interested in this investment opportunity? Contact us to learn more.
-                                        </Paragraph>
-                                        <Button
-                                            type="primary"
-                                            block
-                                            size="middle"
-                                            style={{
-                                                borderRadius: '6px',
-                                                height: '40px',
-                                                fontSize: '14px',
-                                                fontWeight: '500'
-                                            }}
-                                        >
-                                            Request More Information
-                                        </Button>
-                                    </Card>
+                                        Schedule Meeting
+                                    </Button>
                                 </div>
-                            </div>
+                            </Space>
                         </div>
                     </div>
                 )}
             </Modal>
+
+            {/* Meeting Form Modal */}
+            <Modal
+                open={showMeetingForm}
+                onCancel={() => {
+                    setShowMeetingForm(false);
+                    form.resetFields();
+                }}
+                title={
+                    <Space>
+                        <VideoCameraOutlined style={{ color: '#667eea' }} />
+                        <span>Create Meeting Room</span>
+                    </Space>
+                }
+                footer={[
+                    <Button
+                        key="cancel"
+                        onClick={() => {
+                            setShowMeetingForm(false);
+                            form.resetFields();
+                        }}
+                        size="large"
+                    >
+                        Cancel
+                    </Button>,
+                    <Button
+                        key="create"
+                        type="primary"
+                        onClick={handleCreateRoom}
+                        size="large"
+                        style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            border: 'none'
+                        }}
+                    >
+                        Create Room
+                    </Button>
+                ]}
+                width={520}
+                centered
+            >
+                <Form
+                    form={form}
+                    layout="vertical"
+                    initialValues={{
+                        topic: selected ? `Introduction: ${selected.projectName}` : '',
+                        meetingTime: null,
+                        description: ""
+                    }}
+                    requiredMark="optional"
+                >
+                    <Form.Item
+                        name="topic"
+                        label="Meeting Topic"
+                        rules={[{ required: true, message: 'Please input meeting topic' }]}
+                    >
+                        <Input
+                            size="large"
+                            placeholder="Enter meeting topic..."
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="meetingTime"
+                        label="Meeting Time"
+                        rules={[{ required: true, message: 'Please select meeting time' }]}
+                    >
+                        <DatePicker
+                            showTime={{
+                                format: 'HH:mm',
+                                minuteStep: 15,
+                                showNow: true
+                            }}
+                            format="YYYY-MM-DD HH:mm"
+                            style={{ width: '100%' }}
+                            size="large"
+                            disabledDate={(current) => {
+                                return current && current.valueOf() < Date.now();
+                            }}
+                            placeholder="Select date and time"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="description"
+                        label="Additional Notes"
+                    >
+                        <Input.TextArea
+                            rows={4}
+                            placeholder="Enter any additional information about the meeting..."
+                            showCount
+                            maxLength={500}
+                        />
+                    </Form.Item>
+                </Form>
+            </Modal>
         </div>
     );
-}
+};
 
 export default FindProjects;

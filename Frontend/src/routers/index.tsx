@@ -23,6 +23,7 @@ import RoomAndContract from '../pages/Admin/RoomAndContract'
 import AdminLayout from '../components/AdminLayout'
 import ProjectDetails from '../pages/Startup/ProjectDetails';
 import ProfileInvestor from '../pages/Investor/ProfileInvestor'
+import Room from '../pages/Investor/Room'
 
 // admin layout moved to components/AdminLayout
 
@@ -54,6 +55,7 @@ export default function AppRoutes() {
                 <Route path="find-projects" element={<FindProjects />} />
                 <Route path="progress-tracking" element={<ProgressTracking />} />
                 <Route path="invested-projects" element={<InvestedProjects />} />
+                <Route path="room" element={<Room />} />
                 <Route path="payments" element={<Payments />} />
                 <Route path="profile-investor" element={<ProfileInvestor />} />
             </Route>
