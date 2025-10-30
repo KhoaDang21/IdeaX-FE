@@ -12,7 +12,7 @@ export interface Project {
   location: string;
   website?: string;
   description: string;
-  status: "DRAFT" | "PUBLISHED" | "APPROVED" | "REJECTED" | "COMPLETE";
+  status: "DRAFT" | "PUBLISHED" | "APPROVED" | "REJECTED" | "COMPLETE" | "PAUSED";
   adminNote?: string;
   startupId: number;
   createdAt: string;

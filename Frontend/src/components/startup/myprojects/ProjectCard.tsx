@@ -26,9 +26,9 @@ const getStatusText = (status: string): string => {
     case "APPROVED":
       return "In Deal";
     case "DRAFT":
-      return "Pending Review";
+      return "Waiting for Review";
     case "PUBLISHED":
-      return "Active";
+      return "Ongoing";
     case "REJECTED":
       return "Rejected";
     case "COMPLETE":

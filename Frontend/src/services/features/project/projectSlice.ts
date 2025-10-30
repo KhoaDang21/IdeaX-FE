@@ -118,14 +118,17 @@ export const approveProject = createAsyncThunk<
   }
 });
 
-// PUT /projects/{id}/reject (unchanged)
+// PUT /projects/{id}/reject
 export const rejectProject = createAsyncThunk<
   Project,
-  number,
+  { id: number; note: string }, // <-- Thay đổi: Từ 'number' thành object
   { rejectValue: string; state: RootState }
->("projects/reject", async (id, { rejectWithValue }) => {
+>("projects/reject", async ({ id, note }, { rejectWithValue }) => { // <-- Thay đổi: Destructure { id, note }
   try {
-    const res = await api.put(`/projects/${id}/reject`, {});
+    // Thay đổi: Gửi 'note' dưới dạng query param
+    const res = await api.put(`/projects/${id}/reject`, {}, {
+      params: { note } // <-- Thao tác này sẽ thêm "?note=..." vào URL
+    });
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -166,6 +169,22 @@ export const getAllProjects = createAsyncThunk<
   } catch (err: any) {
     return rejectWithValue(
       err.response?.data?.message || "Failed to get all projects"
+    );
+  }
+});
+
+// PUT /projects/{id}/publish
+export const publishProject = createAsyncThunk<
+  Project,
+  number,
+  { rejectValue: string; state: RootState }
+>("projects/publish", async (id, { rejectWithValue }) => {
+  try {
+    const res = await api.put(`/projects/${id}/publish`, {});
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to publish project"
     );
   }
 });
@@ -227,12 +246,11 @@ export const getMilestonesByProject = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >(
   "milestones/getByProject",
-  async (projectId, { rejectWithValue, getState }) => {
+  async (projectId, { rejectWithValue }) => { // <-- Xóa 'getState'
     try {
-      const token = getToken(getState);
-      const res = await api.get(`/api/milestones/project/${projectId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Xóa dòng 'const token = ...'
+      const res = await api.get(`/api/milestones/project/${projectId}`); // <-- Xóa 'headers'
+      
       // Lấy mảng milestones từ API
       const milestones: Milestone[] = res.data;
 
@@ -248,7 +266,7 @@ export const getMilestonesByProject = createAsyncThunk<
       );
     }
   }
-});
+);
 
 // POST /api/milestones/project/{projectId} (unchanged)
 export const createMilestone = createAsyncThunk<
@@ -330,6 +348,13 @@ const projectSlice = createSlice({
         }
       })
       .addCase(rejectProject.fulfilled, (state, action) => {
+        const i = state.projects.findIndex((p) => p.id === action.payload.id);
+        if (i !== -1) state.projects[i] = action.payload;
+        if (state.project && state.project.id === action.payload.id) {
+          state.project = action.payload;
+        }
+      })
+      .addCase(publishProject.fulfilled, (state, action) => {
         const i = state.projects.findIndex((p) => p.id === action.payload.id);
         if (i !== -1) state.projects[i] = action.payload;
         if (state.project && state.project.id === action.payload.id) {
