@@ -11,17 +11,8 @@ import type { RootState } from "../../../store";
 import type { Project } from "../../../interfaces/project";
 import type { Milestone } from "../../../interfaces/milestone";
 
-// Helper to get token
-const getToken = (getState: any) => {
-  const state = getState();
-  const token = state.auth?.token;
-  return (
-    token ||
-    localStorage.getItem("authToken") ||
-    localStorage.getItem("token") ||
-    sessionStorage.getItem("authToken")
-  );
-};
+// NOTE: Authorization header is handled by `axiosInstance` interceptor.
+// Do NOT read or write localStorage in this slice; rely on `api` for auth headers.
 
 // Define the state interface
 interface ProjectState {
@@ -48,17 +39,13 @@ export const createProject = createAsyncThunk<
   Project,
   FormData,
   { rejectValue: string; state: RootState }
->("projects/createProject", async (formData, { rejectWithValue, getState }) => {
+>("projects/createProject", async (formData, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    if (!token) return rejectWithValue("Authentication required.");
-
+    // Don't manage auth here; axios interceptor will attach Authorization header if present.
     if (!formData.has("status")) formData.append("status", "DRAFT");
     if (!formData.has("fundingStage")) formData.append("fundingStage", "SEED");
 
-    const response = await api.post("/projects", formData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.upload("/projects", formData);
     return response.data;
   } catch (error: any) {
     return rejectWithValue(
@@ -72,12 +59,9 @@ export const getProjectById = createAsyncThunk<
   Project,
   number,
   { rejectValue: string; state: RootState }
->("projects/getById", async (id, { rejectWithValue, getState }) => {
+>("projects/getById", async (id, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.get(`/projects/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.get(`/projects/${id}`);
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -91,12 +75,9 @@ export const updateProject = createAsyncThunk<
   Project,
   { id: number; data: Partial<Project> },
   { rejectValue: string; state: RootState }
->("projects/update", async ({ id, data }, { rejectWithValue, getState }) => {
+>("projects/update", async ({ id, data }, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.put(`/projects/${id}`, data, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.put(`/projects/${id}`, data);
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -110,12 +91,9 @@ export const deleteProject = createAsyncThunk<
   number,
   number,
   { rejectValue: string; state: RootState }
->("projects/delete", async (id, { rejectWithValue, getState }) => {
+>("projects/delete", async (id, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    await api.delete(`/projects/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await api.delete(`/projects/${id}`);
     return id;
   } catch (err: any) {
     return rejectWithValue(
@@ -129,16 +107,9 @@ export const approveProject = createAsyncThunk<
   Project,
   number,
   { rejectValue: string; state: RootState }
->("projects/approve", async (id, { rejectWithValue, getState }) => {
+>("projects/approve", async (id, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.put(
-      `/projects/${id}/approve`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const res = await api.put(`/projects/${id}/approve`, {});
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -152,16 +123,9 @@ export const rejectProject = createAsyncThunk<
   Project,
   number,
   { rejectValue: string; state: RootState }
->("projects/reject", async (id, { rejectWithValue, getState }) => {
+>("projects/reject", async (id, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.put(
-      `/projects/${id}/reject`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const res = await api.put(`/projects/${id}/reject`, {});
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -175,12 +139,9 @@ export const getMyProjects = createAsyncThunk<
   Project[],
   void,
   { rejectValue: string; state: RootState }
->("projects/getMy", async (_, { rejectWithValue, getState }) => {
+>("projects/getMy", async (_, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.get("/projects/my", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.get("/projects/my");
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -189,17 +150,18 @@ export const getMyProjects = createAsyncThunk<
   }
 });
 
-// GET /projects/all (get all projects for investors)
+// GET /projects/public (get public projects for investors)
 export const getAllProjects = createAsyncThunk<
   Project[],
   void,
   { rejectValue: string; state: RootState }
->("projects/getAll", async (_, { rejectWithValue, getState }) => {
+>("projects/getAll", async (_, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.get("/projects/all", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // Backend exposes `/projects/all` (admin) and `/projects/my` for owner.
+    // Historically FE called `/projects/public` which does not exist -> 404.
+    // Use `/projects/all` to retrieve projects list from BE. Note: backend may restrict to ADMIN,
+    // but this matches available backend routes. Handle failures gracefully in UI.
+    const res = await api.get("/projects/all");
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -215,12 +177,9 @@ export const getMilestoneById = createAsyncThunk<
   Milestone,
   number,
   { rejectValue: string; state: RootState }
->("milestones/getById", async (id, { rejectWithValue, getState }) => {
+>("milestones/getById", async (id, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.get(`/api/milestones/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.get(`/api/milestones/${id}`);
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -234,12 +193,9 @@ export const updateMilestone = createAsyncThunk<
   Milestone,
   { id: number; data: Partial<Milestone> },
   { rejectValue: string; state: RootState }
->("milestones/update", async ({ id, data }, { rejectWithValue, getState }) => {
+>("milestones/update", async ({ id, data }, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    const res = await api.put(`/api/milestones/${id}`, data, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.put(`/api/milestones/${id}`, data);
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -253,12 +209,9 @@ export const deleteMilestone = createAsyncThunk<
   number,
   number,
   { rejectValue: string; state: RootState }
->("milestones/delete", async (id, { rejectWithValue, getState }) => {
+>("milestones/delete", async (id, { rejectWithValue }) => {
   try {
-    const token = getToken(getState);
-    await api.delete(`/api/milestones/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await api.delete(`/api/milestones/${id}`);
     return id;
   } catch (err: any) {
     return rejectWithValue(
@@ -295,7 +248,7 @@ export const getMilestonesByProject = createAsyncThunk<
       );
     }
   }
-);
+});
 
 // POST /api/milestones/project/{projectId} (unchanged)
 export const createMilestone = createAsyncThunk<
@@ -305,22 +258,16 @@ export const createMilestone = createAsyncThunk<
     data: Omit<Milestone, "id" | "createdAt" | "updatedAt">;
   },
   { rejectValue: string; state: RootState }
->(
-  "milestones/create",
-  async ({ projectId, data }, { rejectWithValue, getState }) => {
-    try {
-      const token = getToken(getState);
-      const res = await api.post(`/api/milestones/project/${projectId}`, data, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return res.data;
-    } catch (err: any) {
-      return rejectWithValue(
-        err.response?.data?.message || "Failed to create milestone"
-      );
-    }
+>("milestones/create", async ({ projectId, data }, { rejectWithValue }) => {
+  try {
+    const res = await api.post(`/api/milestones/project/${projectId}`, data);
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to create milestone"
+    );
   }
-);
+});
 
 // Define type for rejected action
 interface RejectedAction extends UnknownAction {

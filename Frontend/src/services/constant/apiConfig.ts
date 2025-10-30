@@ -1,4 +1,5 @@
 export const BASE_URL = "http://localhost:8081";
+// export const BASE_URL = "https://ideax-backend.onrender.com";
 
 // Auth endpoints
 export const LOGIN_ENDPOINT = `${BASE_URL}/auth/login`;
