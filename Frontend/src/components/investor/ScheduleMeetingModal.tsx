@@ -79,6 +79,7 @@ const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
       ]}
       width={520}
       centered
+      zIndex={1001} // Thêm zIndex cao hơn modal detail
     >
       <Form form={form} layout="vertical" requiredMark="optional">
         <Form.Item
