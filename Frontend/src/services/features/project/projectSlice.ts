@@ -225,14 +225,28 @@ export const getMilestonesByProject = createAsyncThunk<
   Milestone[],
   number,
   { rejectValue: string; state: RootState }
->("milestones/getByProject", async (projectId, { rejectWithValue }) => {
-  try {
-    const res = await api.get(`/api/milestones/project/${projectId}`);
-    return res.data;
-  } catch (err: any) {
-    return rejectWithValue(
-      err.response?.data?.message || "Failed to get milestones"
-    );
+>(
+  "milestones/getByProject",
+  async (projectId, { rejectWithValue, getState }) => {
+    try {
+      const token = getToken(getState);
+      const res = await api.get(`/api/milestones/project/${projectId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Lấy mảng milestones từ API
+      const milestones: Milestone[] = res.data;
+
+      // DÙNG .map ĐỂ TRẢ VỀ MỘT MẢNG MỚI,
+      // MỖI MILESTONE ĐỀU ĐƯỢC GẮN THÊM projectId
+      return milestones.map(milestone => ({
+        ...milestone,
+        projectId: projectId // <-- Thêm ID của project vào đây
+      }));
+    } catch (err: any) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to get milestones"
+      );
+    }
   }
 });
 
@@ -324,7 +338,12 @@ const projectSlice = createSlice({
       })
       /* MILESTONES CRUD */
       .addCase(getMilestonesByProject.fulfilled, (state, action) => {
-        state.milestones = action.payload;
+        // Tạo 1 Set chứa các ID milestones đã có
+  const existingIds = new Set(state.milestones.map(m => m.id));
+  // Lọc ra các milestones mới chưa có trong state
+  const newMilestones = action.payload.filter(m => !existingIds.has(m.id));
+  // Nối các milestones mới vào state
+  state.milestones.push(...newMilestones);
       })
       .addCase(createMilestone.fulfilled, (state, action) => {
         state.milestones.push(action.payload);

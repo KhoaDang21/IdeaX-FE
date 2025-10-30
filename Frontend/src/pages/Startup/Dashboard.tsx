@@ -1,241 +1,66 @@
-import type { FC } from 'react';
-import { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import type { FC } from "react";
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Row, Col } from "antd";
+import type { RootState, AppDispatch } from "../../store";
+// Import thêm getMilestonesByProject và kiểu Milestone
 import {
-  FundOutlined,
-  DollarCircleOutlined,
-  TeamOutlined,
-  UserAddOutlined,
-  FileOutlined,
-  CalendarOutlined,
-} from "@ant-design/icons";
-import type { RootState } from '../../store';
-import { getMyProjects } from '../../services/features/project/projectSlice';
-import type { Project as ApiProject } from '../../interfaces/project';
+  getMyProjects,
+  getMilestonesByProject,
+} from "../../services/features/project/projectSlice";
+import type { Project as ApiProject } from "../../interfaces/project";
+import type { Milestone as ApiMilestone } from "../../interfaces/milestone"; // <-- Import kiểu Milestone
+import type {
+  DashboardStats,
+  Activity,
+  ProjectMilestone,
+} from "../../interfaces/startup/dashboard";
 
-// Interfaces cho dashboard data
-interface DashboardStats {
-  totalProjects: number;
-  fundingRaised: number;
-  interestedInvestors: number;
-}
+// Import child components
+import { DashboardStatsGrid } from "../../components/startup/dashboard/DashboardStatsGrid";
+import { FundingTrendsChart } from "../../components/startup/dashboard/FundingTrendsChart";
+import { ProjectsByStageChart } from "../../components/startup/dashboard/ProjectsByStageChart";
+import { ProjectMilestonesList } from "../../components/startup/dashboard/ProjectMilestonesList";
+import { RecentActivityList } from "../../components/startup/dashboard/RecentActivityList";
+import { AllActivitiesModal } from "../../components/startup/dashboard/AllActivitiesModal";
 
-interface RecentMessage {
-  id: number;
-  sender: string;
-  company: string;
-  message: string;
-  timestamp: string;
-  unread: boolean;
-}
-
-interface Activity {
-  id: number;
-  type: string;
-  title: string;
-  project: string;
-  timestamp: string;
-  icon: string;
-}
+// Define a proper initial state for DashboardStats
+const initialStats: DashboardStats = {
+  totalProjects: 0,
+  fundingRaised: 0,
+  interestedInvestors: 0,
+  avgInvestorEngagement: 0,
+  growthRate: 0,
+};
 
 const StartupDashboard: FC = () => {
-  const dispatch = useDispatch();
-  const { projects: apiProjects } = useSelector((state: RootState) => state.project);
-  
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProjects: 0,
-    fundingRaised: 0,
-    interestedInvestors: 0,
-  });
-  
-  const [recentMessages, setRecentMessages] = useState<RecentMessage[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const dispatch = useDispatch<AppDispatch>();
+  // Lấy cả projects và milestones từ Redux state
+  const { projects: apiProjects, milestones: apiMilestones } = useSelector(
+    (state: RootState) => state.project
+  );
+
+  // --- Component States ---
+  const [stats, setStats] = useState<DashboardStats>(initialStats);
+  const [allActivities, setAllActivities] = useState<Activity[]>([]);
+  // State này lưu trữ milestones đã map cho UI
+  const [displayMilestones, setDisplayMilestones] = useState<
+    ProjectMilestone[]
+  >([]);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<string>("6m");
+  const [fundingStageData, setFundingStageData] = useState<any[]>([]);
+  const [monthlyTrends, setMonthlyTrends] = useState<any[]>([]);
+  const [isActivityModalVisible, setIsActivityModalVisible] = useState(false);
 
-  // Hàm tính toán stats từ projects thực tế - GIỐNG MyProjects
-  const calculateStats = (projects: ApiProject[]): DashboardStats => {
-    const totalProjects = projects.length;
-    const fundingRaised = projects.reduce((sum, project) => sum + (project.fundingAmount || 0), 0);
-    const interestedInvestors = projects.reduce((sum, project) => sum + (project.investorClicks || 0), 0);
-
-    return {
-      totalProjects,
-      fundingRaised,
-      interestedInvestors,
-    };
-  };
-
-  // Hàm format currency - GIỐNG MyProjects
+  // --- Helper Functions ---
   const formatCurrency = (amount: number): string => {
-    if (amount === 0) return '$0';
-    if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
-    } else if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(1)}K`;
-    }
+    if (amount === 0) return "$0";
+    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
+    if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
     return `$${amount}`;
   };
 
-  // Hàm hiển thị fundingRange từ API - GIỐNG MyProjects
-  const getFundingRangeDisplay = (fundingRange: string): string => {
-    const rangeMap: { [key: string]: string } = {
-      'UNDER_50K': 'UNDER $50K',
-      'FROM_50K_TO_200K': '$50K - $200K',
-      'FROM_200K_TO_1M': '$200K - $1M',
-      'OVER_1M': 'Over $1M'
-    };
-    return rangeMap[fundingRange] || 'Not specified';
-  };
-
-  // Hàm generate timeline - GIỐNG MyProjects
-  const generateTimeline = (project: ApiProject): Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }> => {
-    const stages = ['Initial Review', 'Contract Signing', 'Funding Completion'];
-    return stages.map((stage) => {
-      let status: "completed" | "in-progress" | "upcoming" = "upcoming";
-      let date = "";
-      if (stage === 'Initial Review' && project.createdAt) {
-        date = new Date(project.createdAt).toISOString().split('T')[0];
-      }
-      switch (project.status) {
-        case 'DRAFT':
-          if (stage === 'Initial Review') status = 'in-progress';
-          break;
-        case 'PUBLISHED':
-          if (stage === 'Initial Review') status = 'completed';
-          else if (stage === 'Contract Signing') status = 'in-progress';
-          break;
-        case 'APPROVED':
-          if (['Initial Review', 'Contract Signing'].includes(stage)) status = 'completed';
-          else if (stage === 'Funding Completion') status = 'in-progress';
-          break;
-        case 'COMPLETE':
-          status = 'completed';
-          break;
-      }
-      if (status === "completed" && !date) {
-        date = new Date().toISOString().split('T')[0];
-      }
-      return { stage, date, status };
-    });
-  };
-
-  // Hàm tính progress - GIỐNG MyProjects (17%, 50%, 83%, 100%)
-  const calculateProgressFromTimeline = (timeline: Array<{ stage: string; date: string; status: "completed" | "in-progress" | "upcoming" }>): number => {
-    const completedStages = timeline.filter(s => s.status === "completed").length;
-    const inProgressStages = timeline.filter(s => s.status === "in-progress").length;
-    const progress = (completedStages * 33.33) + (inProgressStages * 16.67);
-    return Math.min(Math.round(progress), 100);
-  };
-
-  // Hàm lấy stage name với trạng thái - GIỐNG MyProjects
-  const getStageName = (project: ApiProject): string => {
-    const timeline = generateTimeline(project);
-    const order: Record<string, number> = { "Initial Review": 0, "Contract Signing": 1, "Funding Completion": 2 };
-    const sortedTimeline = [...timeline].sort((a, b) => order[a.stage] - order[b.stage]);
-    
-    let stageName = "Initial Review";
-    let stageStatus: "completed" | "in-progress" | "upcoming" = "upcoming";
-    
-    for (const item of sortedTimeline) {
-      if (item.status === "completed" || item.status === "in-progress") {
-        stageName = item.stage;
-        stageStatus = item.status;
-      }
-    }
-
-    let stage = stageName;
-    if (stageStatus === 'in-progress') {
-      stage += ' (Currently in progress)';
-    }
-    const lastStage = sortedTimeline[sortedTimeline.length - 1];
-    if (lastStage?.status === 'completed') {
-      stage = `${lastStage.stage} (Completed)`;
-    }
-
-    return stage;
-  };
-
-  // Hàm get status color - GIỐNG MyProjects
-  const getStatusColor = (status: string) => {
-    switch (status.toUpperCase()) {
-      case "APPROVED": return { background: "#dcfce7", color: "#16a34a" };
-      case "DRAFT": return { background: "#fef3c7", color: "#92400e" };
-      case "PUBLISHED": return { background: "#dbeafe", color: "#1e40af" };
-      case "REJECTED": return { background: "#fee2e2", color: "#ef4444" };
-      case "COMPLETE": return { background: "#e0f2fe", color: "#0284c7" };
-      default: return { background: "#e5e7eb", color: "#6b7280" };
-    }
-  };
-
-  // Hàm get status text - GIỐNG MyProjects
-  const getStatusText = (status: string): string => {
-    switch (status.toUpperCase()) {
-      case "APPROVED": return "In Deal";
-      case "DRAFT": return "Pending Review";
-      case "PUBLISHED": return "Active";
-      case "REJECTED": return "Rejected";
-      case "COMPLETE": return "Completed";
-      default: return status;
-    }
-  };
-
-  // API call để lấy messages thực tế
-  const fetchRecentMessages = async (): Promise<RecentMessage[]> => {
-    try {
-      // Thay bằng API endpoint thực tế của bạn
-      const response = await fetch('/api/messages/recent', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        return data.messages.map((msg: any) => ({
-          id: msg.id,
-          sender: msg.senderName,
-          company: msg.company || '',
-          message: msg.content,
-          timestamp: formatTimeAgo(new Date(msg.createdAt)),
-          unread: !msg.isRead
-        }));
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      return [];
-    }
-  };
-
-  // API call để lấy activities thực tế từ user behavior
-  const fetchRecentActivities = async (): Promise<Activity[]> => {
-    try {
-      // Thay bằng API endpoint thực tế của bạn
-      const response = await fetch('/api/activities/recent', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        return data.activities.map((activity: any) => ({
-          id: activity.id,
-          type: activity.type,
-          title: getActivityTitle(activity.type),
-          project: activity.projectName || 'General',
-          timestamp: formatTimeAgo(new Date(activity.createdAt)),
-          icon: getActivityIcon(activity.type)
-        }));
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching activities:', error);
-      return [];
-    }
-  };
-
-  // Hàm format thời gian (giống như trong MyProjects)
   const formatTimeAgo = (date: Date): string => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -243,283 +68,419 @@ const StartupDashboard: FC = () => {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 60) {
-      return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
-    } else {
-      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
-    }
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
   };
 
-  // Map activity type to title
-  const getActivityTitle = (type: string): string => {
-    const titleMap: { [key: string]: string } = {
-      'PROJECT_CREATED': 'Project Created',
-      'PROJECT_UPDATED': 'Project Updated',
-      'INVESTOR_VIEW': 'Investor Viewed Project',
-      'MILESTONE_COMPLETED': 'Milestone Completed',
-      'DOCUMENT_UPDATED': 'Document Updated',
-      'MEETING_SCHEDULED': 'Meeting Scheduled',
-      'FUNDING_UPDATE': 'Funding Status Updated'
+  const formatFundingStage = (stage: string): string => {
+    const stageMap: { [key: string]: string } = {
+      IDEA: "Idea",
+      SEED: "Seed",
+      SERIES_A: "Series A",
+      SERIES_B: "Series B",
+      SERIES_C: "Series C",
+      IPO: "IPO",
     };
-    return titleMap[type] || 'Activity';
+    return stageMap[stage] || stage;
   };
 
-  // Map activity type to icon
-  const getActivityIcon = (type: string): string => {
-    const iconMap: { [key: string]: string } = {
-      'PROJECT_CREATED': 'user-add',
-      'PROJECT_UPDATED': 'file',
-      'INVESTOR_VIEW': 'team',
-      'MILESTONE_COMPLETED': 'check',
-      'DOCUMENT_UPDATED': 'file',
-      'MEETING_SCHEDULED': 'calendar',
-      'FUNDING_UPDATE': 'dollar'
+  const fundingStageColors = {
+    IDEA: "#8b5cf6",
+    SEED: "#3b82f6",
+    SERIES_A: "#10b981",
+    SERIES_B: "#f59e0b",
+    SERIES_C: "#ef4444",
+    IPO: "#6b7280",
+  };
+
+  const calculateStats = (projects: ApiProject[]): DashboardStats => {
+    const totalProjects = projects.length;
+    const fundingRaised = projects.reduce(
+      (sum, p) => sum + (p.fundingAmount || 0),
+      0
+    );
+    const interestedInvestors = projects.reduce(
+      (sum, p) => sum + (p.investorClicks || 0),
+      0
+    );
+    const avgInvestorEngagement =
+      totalProjects > 0 ? Math.round(interestedInvestors / totalProjects) : 0;
+    const growthRate =
+      totalProjects > 0
+        ? Math.round(interestedInvestors / totalProjects / 10)
+        : 0; // Simple example
+    return {
+      totalProjects,
+      fundingRaised,
+      interestedInvestors,
+      avgInvestorEngagement,
+      growthRate,
     };
-    return iconMap[type] || 'file';
   };
 
-  // Load data khi component mount
+  // --- Data Calculation Logic ---
+  // Hàm này giờ tính toán chart data, map activities, VÀ map milestones
+  const calculateDisplayData = (
+    projects: ApiProject[],
+    milestonesData: ApiMilestone[]
+  ) => {
+    // Calculate Funding Stage Distribution
+    const stageCount: { [key: string]: number } = {};
+    Object.keys(fundingStageColors).forEach((stage) => {
+      stageCount[stage] = 0;
+    });
+    projects.forEach((project) => {
+      const stage = project.fundingStage || "IDEA";
+      stageCount[stage] = (stageCount[stage] || 0) + 1;
+    });
+    const totalProjectsCount = projects.length;
+    const stageData = Object.entries(stageCount).map(([stage, count]) => ({
+      stage: formatFundingStage(stage),
+      count,
+      percent:
+        totalProjectsCount > 0
+          ? Math.round((count / totalProjectsCount) * 100)
+          : 0,
+      color:
+        fundingStageColors[stage as keyof typeof fundingStageColors] ||
+        "#6b7280",
+    }));
+    setFundingStageData(stageData);
+
+    // Calculate Monthly Trends
+    const monthlyData: {
+      [key: string]: { projects: number; investors: number; funding: number };
+    } = {};
+    const currentYear = new Date().getFullYear();
+    projects.forEach((project) => {
+      if (
+        !project.createdAt ||
+        new Date(project.createdAt).getFullYear() !== currentYear
+      )
+        return;
+      const date = new Date(project.createdAt);
+      const monthKey = date
+        .toLocaleString("en-US", { month: "short" })
+        .toUpperCase();
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { projects: 0, investors: 0, funding: 0 };
+      }
+      monthlyData[monthKey].projects += 1;
+      monthlyData[monthKey].investors += project.investorClicks || 0;
+      monthlyData[monthKey].funding += project.fundingAmount || 0;
+    });
+    const monthOrder = [
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC",
+    ];
+    const trendsData = monthOrder
+      .map((month) => ({
+        month,
+        projects: monthlyData[month]?.projects || 0,
+        investors: monthlyData[month]?.investors || 0,
+        funding: monthlyData[month]?.funding || 0,
+      }))
+      .filter(
+        (item) => item.projects > 0 || item.investors > 0 || item.funding > 0
+      );
+    setMonthlyTrends(trendsData);
+
+    // --- MAP MILESTONES THỰC TẾ (Lấy từ apiMilestones từ Redux) ---
+    // Chỉ lấy milestones thuộc project đầu tiên (do hạn chế của slice hiện tại)
+    const relevantMilestones = [...milestonesData];
+    // Bạn có thể thêm logic sắp xếp ở đây, ví dụ: sắp xếp theo ngày gần nhất
+    relevantMilestones.sort(
+      (a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+    );
+
+    const mappedMilestones: ProjectMilestone[] = relevantMilestones
+      .slice(0, 4) // Giới hạn hiển thị 4 milestones trên dashboard
+      .map((m) => {
+        const project = projects.find((p) => p.id === m.projectId); // Tìm project tương ứng
+        let status: "completed" | "in-progress" | "upcoming" = "upcoming";
+        let progress = 0;
+
+        // Map trạng thái từ API sang trạng thái UI
+        switch (m.status?.toUpperCase()) {
+          case "COMPLETED":
+            status = "completed";
+            progress = 100;
+            break;
+          case "IN_PROGRESS": // Giả sử có trạng thái này
+            status = "in-progress";
+            progress = 50; // Hoặc logic khác
+            break;
+          case "PENDING":
+          default:
+            status = "upcoming";
+            progress = 0;
+            break;
+        }
+        // Ghi đè thành completed nếu project đã completed
+        if (project?.status === "COMPLETE" && status !== "completed") {
+          status = "completed";
+          progress = 100;
+        }
+
+        return {
+          id: m.id,
+          project: project?.projectName || `Project #${m.projectId}`,
+          milestone: m.title || "Untitled Milestone",
+          dueDate: m.dueDate
+            ? new Date(m.dueDate).toISOString().split("T")[0]
+            : "N/A",
+          status,
+          progress,
+        };
+      });
+    setDisplayMilestones(mappedMilestones); // Cập nhật state displayMilestones
+
+    // Load and Map Activities from localStorage
+    const storedActivities = JSON.parse(
+      localStorage.getItem("recentActivities") || "[]"
+    ) as Array<{ action: string; projectId?: string; timestamp: number }>;
+
+    const mappedActivities: Activity[] = storedActivities.map(
+      (activity, index) => {
+        const projectAct = projects.find(
+          // Đổi tên biến để tránh trùng lặp
+          (p) => String(p.id) === activity.projectId
+        );
+        const actionLower = activity.action.toLowerCase();
+
+        const getIcon = (action: string) => {
+          if (action.includes("created new project")) return "user-add";
+          if (action.includes("created new milestone")) return "check";
+          if (action.includes("deleted project")) return "delete";
+          if (action.includes("deleted milestone")) return "delete";
+          return "file";
+        };
+
+        const getStatus = (
+          projectStatus: string | undefined
+        ): "completed" | "in-progress" | "pending" => {
+          if (projectStatus === "COMPLETE") return "completed";
+          if (projectStatus === "DRAFT") return "pending";
+          return "in-progress";
+        };
+
+        return {
+          id: activity.timestamp || index,
+          type: actionLower.includes("project")
+            ? "PROJECT"
+            : actionLower.includes("milestone")
+            ? "MILESTONE"
+            : "GENERAL",
+          title: activity.action,
+          project:
+            projectAct?.projectName ||
+            (activity.projectId ? `Project #${activity.projectId}` : "General"),
+          timestamp: formatTimeAgo(new Date(activity.timestamp)),
+          icon: getIcon(actionLower),
+          status: getStatus(projectAct?.status),
+        };
+      }
+    );
+    setAllActivities(mappedActivities);
+  };
+
+  // --- Effects ---
   useEffect(() => {
     const loadDashboardData = async () => {
       setLoading(true);
       try {
-        // Load projects từ Redux (đã có trong MyProjects)
-        await dispatch(getMyProjects() as any);
-        
-        // Load messages và activities song song
-        const [messages, activitiesData] = await Promise.all([
-          fetchRecentMessages(),
-          fetchRecentActivities()
-        ]);
-        
-        setRecentMessages(messages);
-        setActivities(activitiesData);
+        const projectAction = await dispatch(getMyProjects());
+        // Chỉ fetch milestones nếu lấy projects thành công VÀ có project
+        if (
+          getMyProjects.fulfilled.match(projectAction) &&
+          projectAction.payload.length > 0
+        ) {
+          // Tạo một mảng các lời hứa (Promise) để fetch milestones cho TẤT CẢ project
+          const milestonePromises = projectAction.payload.map((project) =>
+            dispatch(getMilestonesByProject(project.id))
+          );
+          // Chờ tất cả các lời hứa hoàn thành
+          await Promise.all(milestonePromises);
+        }
       } catch (error) {
-        console.error('Error loading dashboard data:', error);
+        console.error("Error loading dashboard data:", error);
       } finally {
         setLoading(false);
       }
     };
-
     loadDashboardData();
   }, [dispatch]);
 
-  // Update stats khi apiProjects thay đổi
+  // Effect này chạy khi projects HOẶC milestones từ Redux thay đổi
   useEffect(() => {
-    if (apiProjects && apiProjects.length > 0) {
-      const calculatedStats = calculateStats(apiProjects);
-      setStats(calculatedStats);
+    // Chỉ tính toán lại khi apiProjects đã được load (không phải null/undefined)
+    if (apiProjects) {
+      // Truyền apiMilestones (có thể là [] nếu chưa load xong hoặc không có)
+      calculateDisplayData(apiProjects, apiMilestones || []);
+      // Tính stats dựa trên apiProjects
+      if (apiProjects.length > 0) {
+        setStats(calculateStats(apiProjects));
+      } else {
+        setStats(initialStats); // Reset stats nếu không có project
+      }
     }
-  }, [apiProjects]);
+  }, [apiProjects, apiMilestones]); // Phụ thuộc vào cả hai
 
-  // Render icon cho activity
-  const renderActivityIcon = (icon: string) => {
-    const iconProps = { style: { fontSize: 20, color: '#000' } };
-    
-    switch (icon) {
-      case 'user-add':
-        return <UserAddOutlined {...iconProps} />;
-      case 'team':
-        return <TeamOutlined {...iconProps} />;
-      case 'file':
-        return <FileOutlined {...iconProps} />;
-      case 'calendar':
-        return <CalendarOutlined {...iconProps} />;
-      case 'dollar':
-        return <DollarCircleOutlined {...iconProps} />;
-      default:
-        return <FileOutlined {...iconProps} />;
-    }
+  // --- Modal Handlers ---
+  const handleViewAllActivities = () => {
+    setIsActivityModalVisible(true);
+  };
+  const handleCloseActivityModal = () => {
+    setIsActivityModalVisible(false);
   };
 
-  // Background color cho activity icon
-  const getActivityIconBg = (icon: string) => {
-    switch (icon) {
-      case 'user-add': return '#dcfce7';
-      case 'team': return '#eff6ff';
-      case 'file': return '#fefce8';
-      case 'calendar': return '#f5f3ff';
-      case 'dollar': return '#f0fdf4';
-      default: return '#e5e7eb';
-    }
+  // --- Chart Configurations ---
+  const areaChartConfig = {
+    data: monthlyTrends,
+    xField: "month",
+    yField: "funding",
+    smooth: true,
+    height: 120,
+    padding: "auto",
+    areaStyle: () => ({ fill: "l(270) 0:#ffffff 0.5:#764ba2 1:#667eea" }),
+    line: { color: "#667eea" },
+    tooltip: {
+      formatter: (datum: any) => ({
+        name: "Funding",
+        value: formatCurrency(datum.funding),
+      }),
+    },
+    xAxis: { line: null, tickLine: null, label: { style: { fill: "#aaa" } } },
+    yAxis: { grid: null, label: null },
   };
 
+  const fundingColumnConfig = {
+    data: fundingStageData,
+    xField: "stage",
+    yField: "count",
+    colorField: "stage",
+    color: ({ stage }: any) => {
+      const stageKey = Object.keys(fundingStageColors).find(
+        (key) => formatFundingStage(key) === stage
+      );
+      return stageKey
+        ? fundingStageColors[stageKey as keyof typeof fundingStageColors]
+        : "#6b7280";
+    },
+    legend: false,
+    height: 350,
+    padding: "auto",
+    columnStyle: { radius: [4, 4, 0, 0] },
+    tooltip: {
+      formatter: (datum: any) => ({
+        name: datum.stage,
+        value: `${datum.count} projects`,
+      }),
+    },
+    xAxis: {
+      label: { autoHide: true, autoRotate: false, style: { fontSize: 11 } },
+      title: { text: "Funding Stage", style: { fontSize: 12 } },
+    },
+    yAxis: {
+      title: { text: "Number of Projects", style: { fontSize: 12 } },
+      grid: { line: { style: { stroke: "#eee" } } },
+    },
+  };
+
+  // --- Render Logic ---
   if (loading) {
     return (
-      <div style={{ padding: 24, background: '#f9fafb', minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div>Loading dashboard...</div>
+      <div
+        style={{
+          padding: 24,
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        Loading dashboard...
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24, background: '#f9fafb', minHeight: '100vh' }}>
-      {/* Stats Section với data thực tế - CHỈ CÒN 3 STATS */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
-        <div style={{ flex: 1, minWidth: 250, background: '#fff', borderRadius: 12, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FundOutlined style={{ fontSize: 24, color: '#000' }} />
-          </div>
-          <div>
-            <p style={{ fontSize: 14, color: '#475569', margin: 0 }}>Total Projects</p>
-            <h2 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>{stats.totalProjects}</h2>
-          </div>
-        </div>
-        
-        <div style={{ flex: 1, minWidth: 250, background: '#fff', borderRadius: 12, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <DollarCircleOutlined style={{ fontSize: 24, color: '#000' }} />
-          </div>
-          <div>
-            <p style={{ fontSize: 14, color: '#475569', margin: 0 }}>Funding Raised</p>
-            <h2 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>{formatCurrency(stats.fundingRaised)}</h2>
-          </div>
-        </div>
-        
-        <div style={{ flex: 1, minWidth: 250, background: '#fff', borderRadius: 12, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 8, background: '#fefce8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TeamOutlined style={{ fontSize: 24, color: '#000' }} />
-          </div>
-          <div>
-            <p style={{ fontSize: 14, color: '#475569', margin: 0 }}>Interested Investors</p>
-            <h2 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>{stats.interestedInvestors}</h2>
-          </div>
-        </div>
+    <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
+      {/* Header Section */}
+      <div style={{ marginBottom: 24 }}>
+        <h1
+          style={{ fontSize: 28, fontWeight: 700, color: "#1f2937", margin: 0 }}
+        >
+          Startup Dashboard
+        </h1>
+        <p style={{ fontSize: 16, color: "#6b7280", margin: "4px 0 0" }}>
+          Welcome back! Here's your business overview
+        </p>
       </div>
 
-      {/* Main Content - 2 columns layout */}
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        {/* Left Column - Projects với data thực tế và status GIỐNG MyProjects */}
-        <div style={{ flex: 2, minWidth: 400 }}>
-          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 600, color: '#0f172a', margin: 0 }}>Your Projects</h3>
-              <a href="/startup/my-projects" style={{ fontSize: 14, color: '#3b82f6', textDecoration: 'none' }}>View All</a>
-            </div>
+      {/* Stats Grid Component */}
+      <DashboardStatsGrid stats={stats} formatCurrency={formatCurrency} />
 
-            {apiProjects && apiProjects.slice(0, 3).map((project) => {
-              const timeline = generateTimeline(project);
-              const progress = calculateProgressFromTimeline(timeline);
-              const stage = getStageName(project);
-              const statusStyle = getStatusColor(project.status || '');
-              const statusText = getStatusText(project.status || '');
-              
-              return (
-                <div key={project.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                    <div>
-                      <h4 style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', margin: 0 }}>
-                        {project.projectName || 'Untitled Project'}
-                      </h4>
-                      <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>
-                        {project.category} • {project.fundingStage} • {formatTimeAgo(new Date(project.createdAt))}
-                      </p>
-                    </div>
-                    <span style={{ 
-                      fontSize: 12, 
-                      padding: '2px 8px', 
-                      background: statusStyle.background, 
-                      color: statusStyle.color, 
-                      borderRadius: 999 
-                    }}>
-                      {statusText}
-                    </span>
-                  </div>
-                  
-                  {/* CHỈ HIỂN THỊ TARGET, KHÔNG HIỂN THỊ RAISED/TARGET */}
-                  <p style={{ fontSize: 14, fontWeight: 500, color: '#0f172a', margin: '12px 0 0' }}>
-                    Target: {getFundingRangeDisplay(project.fundingRange || '')}
-                  </p>
-                  
-                  <div style={{ width: '100%', background: '#e5e7eb', height: 8, borderRadius: 999, margin: '8px 0' }}>
-                    <div style={{ background: '#3b82f6', height: 8, borderRadius: 999, width: `${progress}%` }}></div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                    <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                      Stage: <span style={{ fontWeight: 500 }}>{stage}</span>
-                    </p>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>{progress}%</p>
-                    <button 
-                      onClick={() => window.location.href = `/startup/projects/${project.id}`}
-                      style={{ color: '#3b82f6', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
-                      View Details
-                    </button>
-                  </div>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: '8px 0 0' }}>
-                    {project.investorClicks || 0} investors
-                  </p>
-                </div>
-              );
-            })}
+      {/* Main Content Area */}
+      <Row gutter={[24, 24]}>
+        {/* Left Column */}
+        <Col xs={24} xl={16}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24}>
+              <FundingTrendsChart
+                stats={stats}
+                monthlyTrends={monthlyTrends}
+                timeRange={timeRange}
+                setTimeRange={setTimeRange}
+                areaChartConfig={areaChartConfig}
+                formatCurrency={formatCurrency}
+              />
+            </Col>
+            <Col xs={24}>
+              <ProjectsByStageChart
+                stats={stats}
+                fundingStageData={fundingStageData}
+                fundingColumnConfig={fundingColumnConfig}
+              />
+            </Col>
+          </Row>
+        </Col>
 
-            {(!apiProjects || apiProjects.length === 0) && (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <p style={{ color: '#64748b', margin: 0 }}>No projects found</p>
-                <a href="/startup/new-project" style={{ color: '#3b82f6', textDecoration: 'none' }}>
-                  Create your first project
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Right Column */}
+        <Col xs={24} xl={8}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24}>
+              {/* Truyền displayMilestones đã được map từ state */}
+              <ProjectMilestonesList milestones={displayMilestones} />
+            </Col>
+            <Col xs={24}>
+              <RecentActivityList
+                activities={allActivities}
+                onViewAll={handleViewAllActivities}
+              />
+            </Col>
+          </Row>
+        </Col>
+      </Row>
 
-        {/* Right Column - Messages và Activity với data thực tế */}
-        <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Messages Section với data thực tế */}
-          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', padding: 16 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#0f172a', margin: '0 0 16px' }}>Recent Messages</h3>
-            
-            {recentMessages.length > 0 ? recentMessages.slice(0, 3).map((message) => (
-              <div key={message.id} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: 12, marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: '#0f172a', margin: 0 }}>
-                    {message.sender}
-                    {message.unread && (
-                      <span style={{ width: 8, height: 8, background: '#ef4444', borderRadius: 999, display: 'inline-block', marginLeft: 4 }}></span>
-                    )}
-                  </p>
-                  <span style={{ fontSize: 12, color: '#64748b' }}>{message.timestamp}</span>
-                </div>
-                {message.company && (
-                  <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0' }}>{message.company}</p>
-                )}
-                <p style={{ fontSize: 14, color: '#475569', margin: 0 }}>
-                  {message.message}
-                </p>
-              </div>
-            )) : (
-              <p style={{ color: '#64748b', textAlign: 'center', margin: 0 }}>No recent messages</p>
-            )}
-            
-            <a href="/messages" style={{ display: 'block', color: '#3b82f6', fontSize: 14, marginTop: 12, fontWeight: 500, textDecoration: 'none' }}>
-              View All Messages
-            </a>
-          </div>
-
-          {/* Activity Section với data thực tế */}
-          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 10px 30px rgba(15,23,42,0.08)', padding: 16 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#0f172a', margin: '0 0 16px' }}>Recent Activity</h3>
-            
-            {activities.length > 0 ? activities.slice(0, 3).map((activity) => (
-              <div key={activity.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, borderBottom: '1px solid #e5e7eb', paddingBottom: 12, marginBottom: 12 }}>
-                <div style={{ flexShrink: 0, borderRadius: 999, background: getActivityIconBg(activity.icon), padding: 8 }}>
-                  {renderActivityIcon(activity.icon)}
-                </div>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: '#0f172a', margin: 0 }}>{activity.title}</p>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>{activity.project}</p>
-                  <span style={{ fontSize: 12, color: '#64748b', display: 'block', marginTop: 4 }}>{activity.timestamp}</span>
-                </div>
-              </div>
-            )) : (
-              <p style={{ color: '#64748b', textAlign: 'center', margin: 0 }}>No recent activities</p>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Modal for All Activities */}
+      <AllActivitiesModal
+        visible={isActivityModalVisible}
+        activities={allActivities}
+        onClose={handleCloseActivityModal}
+      />
     </div>
   );
 };
