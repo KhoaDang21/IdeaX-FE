@@ -1,0 +1,16 @@
+.projectCard {
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid transparent;
+  height: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  border: none;
+  cursor: pointer;
+}
+
+.projectCard:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid #52c41a;
+}
