@@ -73,14 +73,15 @@ const FindProjects: React.FC = () => {
 
       const payload = {
         ...values,
-        meetingTime: meetingTime.format("YYYY-MM-DD HH:mm:00"),
-        startTime: meetingTime.format("YYYY-MM-DD HH:mm:00"),
+        meetingTime: meetingTime.format("YYYY-MM-DDTHH:mm:00"),
+        startTime: meetingTime.format("YYYY-MM-DDTHH:mm:00"),
         endTime: meetingTime
           .clone()
           .add(1, "hour")
-          .format("YYYY-MM-DD HH:mm:00"),
+          .format("YYYY-MM-DDTHH:mm:00"),
         createdById: Number(authUser.id),
         roomCode: `ROOM-${Date.now()}`,
+        projectId: selected.id, // Thêm projectId vào payload
       };
 
       await dispatch(createMeeting(payload)).unwrap();

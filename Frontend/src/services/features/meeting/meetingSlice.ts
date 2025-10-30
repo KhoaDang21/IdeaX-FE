@@ -9,6 +9,7 @@ export interface Meeting {
   startTime: string;
   endTime: string;
   createdById: number;
+  createdByName?: string;
   recordUrl?: string;
 }
 
