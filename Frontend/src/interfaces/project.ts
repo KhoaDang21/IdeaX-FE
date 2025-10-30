@@ -1,5 +1,6 @@
 // src/interfaces/project.ts
 export interface Project {
+  investorClicks: number;
   id: number;
   projectName: string;
   category: string;

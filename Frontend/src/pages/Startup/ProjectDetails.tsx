@@ -103,7 +103,7 @@ const ProjectDetails: React.FC = () => {
   }, [dispatch, id, message]);
 
   const handleBack = () => {
-    navigate('/startup/dashboard');
+    navigate('/startup/my-projects');
   };
 
   if (status === 'loading') {
