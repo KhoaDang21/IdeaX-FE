@@ -1,276 +1,225 @@
-import React, { useState } from "react";
-import { SearchOutlined, CheckOutlined, FileOutlined } from "@ant-design/icons";
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState, AppDispatch } from "../../store";
+import {
+  fetchMeetingsByStartup,
+  confirmMeeting,
+  signMeetingNda,
+  type MeetingStatus,
+} from "../../services/features/meeting/meetingSlice";
+import { api } from "../../services/constant/axiosInstance";
+import {
+  Table,
+  Button,
+  Tag,
+  Space,
+  Typography,
+  message,
+  Empty,
+  Card,
+} from "antd";
+import {
+  VideoCameraOutlined,
+  EditOutlined,
+  CheckOutlined,
+  CalendarOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+
+const { Title, Text } = Typography;
 
 const Roommeet: React.FC = () => {
-  const [message, setMessage] = useState("");
-  const [progress, setProgress] = useState([
-    { label: "NDA signed", checked: true },
-    { label: "Proposal sent", checked: true },
-    { label: "Investment terms agreed", checked: false },
-  ]);
+  const dispatch = useDispatch<AppDispatch>();
+  const meetingsState = useSelector((s: RootState) => s.meeting);
+  const authUser = useSelector((s: RootState) => s.auth.user);
 
-  const handleCheckboxChange = (index: number) => {
-    const updatedProgress = progress.map((item, i) =>
-      i === index ? { ...item, checked: !item.checked } : item
-    );
-    setProgress(updatedProgress);
+  useEffect(() => {
+    if (authUser?.id) {
+      dispatch(fetchMeetingsByStartup(authUser.id) as any).catch(() => {});
+    }
+  }, [dispatch, authUser]);
+
+  const handleConfirm = async (meetingId: number) => {
+    if (!authUser) {
+      message.error("Vui lòng đăng nhập");
+      return;
+    }
+
+    try {
+      await dispatch(confirmMeeting({ meetingId, startupId: authUser.id })).unwrap();
+      message.success("Xác nhận meeting thành công!");
+      dispatch(fetchMeetingsByStartup(authUser.id) as any);
+    } catch (err: any) {
+      message.error(err?.message || "Lỗi khi xác nhận meeting");
+    }
   };
 
+  const handleSignNDA = async (meetingId: number) => {
+    if (!authUser) {
+      message.error("Vui lòng đăng nhập");
+      return;
+    }
+
+    try {
+      await dispatch(signMeetingNda({ meetingId, userId: authUser.id })).unwrap();
+      message.success("Ký NDA thành công!");
+      dispatch(fetchMeetingsByStartup(authUser.id) as any);
+    } catch (err: any) {
+      message.error(err?.message || "Lỗi khi ký NDA");
+    }
+  };
+
+  const handleJoin = async (meetingId: number) => {
+    if (!authUser) {
+      message.error("Vui lòng đăng nhập để tham gia meeting");
+      return;
+    }
+
+    try {
+      const res = await api.get(`/api/meetings/${meetingId}/join/${authUser.id}`);
+      const url = res.data;
+      if (url) {
+        window.open(url, "_blank");
+      } else {
+        message.error("Không thể lấy link tham gia");
+      }
+    } catch (err: any) {
+      message.error(err.response?.data || err.message || "Lỗi khi lấy link tham gia");
+    }
+  };
+
+  const getStatusTag = (status?: MeetingStatus) => {
+    switch (status) {
+      case "PENDING":
+        return <Tag color="orange">Chờ xác nhận</Tag>;
+      case "WAITING_NDA":
+        return <Tag color="blue">Chờ ký NDA</Tag>;
+      case "CONFIRMED":
+        return <Tag color="green">Đã xác nhận</Tag>;
+      default:
+        return <Tag>Không xác định</Tag>;
+    }
+  };
+
+  const columns = [
+    {
+      title: "Topic",
+      dataIndex: "topic",
+      key: "topic",
+      render: (text: string) => <Text strong>{text}</Text>,
+    },
+    {
+      title: "Project",
+      dataIndex: "projectName",
+      key: "projectName",
+      render: (text: string) => text || "N/A",
+    },
+    {
+      title: "Investor",
+      dataIndex: "createdByName",
+      key: "createdByName",
+      render: (text: string) => (
+        <Space>
+          <UserOutlined />
+          <Text>{text}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: "Meeting Time",
+      dataIndex: "meetingTime",
+      key: "meetingTime",
+      render: (time: string) => (
+        <Space>
+          <CalendarOutlined />
+          <Text>
+            {new Date(time).toLocaleString("vi-VN", {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (status: MeetingStatus) => getStatusTag(status),
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_: any, record: any) => (
+        <Space>
+          {record.status === "PENDING" && (
+            <Button
+              type="primary"
+              icon={<CheckOutlined />}
+              onClick={() => handleConfirm(record.id)}
+            >
+              Xác nhận
+            </Button>
+          )}
+          {record.status === "WAITING_NDA" && record.startupStatus !== "CONFIRMED" && (
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => handleSignNDA(record.id)}
+            >
+              Ký NDA
+            </Button>
+          )}
+          {record.status === "CONFIRMED" && (
+            <Button
+              type="primary"
+              icon={<VideoCameraOutlined />}
+              onClick={() => handleJoin(record.id)}
+              style={{
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                border: "none",
+              }}
+            >
+              Join Meeting
+            </Button>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
   return (
-    <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
-      <div style={{ display: "flex", gap: 24 }}>
-        {/* Left Sidebar */}
-        <div
-          style={{
-            flex: 1,
-            maxWidth: 300,
-            background: "#fff",
-            borderRadius: 12,
-            padding: 16,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-          }}
-        >
-          <h3 style={{ margin: "0 0 16px", fontSize: 20}}>
-            Your Rooms
-          </h3>
-          <div style={{ position: "relative", marginBottom: 24 }}>
-            <input
-              type="text"
-              placeholder="Search by project or investor..."
-              style={{
-                width: "100%",
-                padding: "8px 32px 8px 12px",
-                borderRadius: 8,
-                border: "1px solid #d1d5db",
-                background: "#fff",
-              }}
-            />
-            <SearchOutlined
-              style={{ position: "absolute", right: 12, top: 10, color: "#64748b" }}
-            />
-          </div>
-          <div
-            style={{
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-              height: 40,
-              background: "#f9fafb",
-              marginBottom: 8,
-            }}
+    <div
+      style={{
+        padding: "24px 16px",
+        background: "linear-gradient(135deg, #f5f7fa 0%, #eaeef5 100%)",
+        minHeight: "100vh",
+      }}
+    >
+      <Card
+        style={{
+          borderRadius: 12,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        }}
+      >
+        <Title level={3} style={{ marginBottom: 24 }}>
+          Meeting Rooms
+        </Title>
+
+        {meetingsState.meetings.length === 0 ? (
+          <Empty description="Chưa có meeting nào" />
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={meetingsState.meetings}
+            rowKey="id"
+            loading={meetingsState.loading}
+            pagination={{ pageSize: 10 }}
           />
-          
-        </div>
-
-        {/* Right Content */}
-        <div style={{ flex: 3 }}>
-          <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>
-            AI-Powered Analytics Platform – Sarah Wilson
-          </h2>
-          <div
-            style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
-          >
-            <span style={{ fontSize: 14, marginRight: 8 }}>Deal Status:</span>
-            <span
-              style={{
-                fontSize: 12,
-                background: "#eff6ff",
-                color: "#3b82f6",
-                padding: "4px 12px",
-                borderRadius: 999,
-                marginRight: 8,
-              }}
-            >
-              Under NDA
-            </span>
-            <button
-              style={{
-                fontSize: 12,
-                background: "transparent",
-                color: "#3b82f6",
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <FileOutlined style={{ marginRight: 4 }} /> Download NDA
-            </button>
-          </div>
-          <hr
-            style={{
-              border: 0,
-              height: 1,
-              background: "#d1d5db",
-              marginBottom: 16,
-            }}
-          />
-
-          {/* Message History */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 24,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-            }}
-          >
-            <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Message History</h3>
-            <div
-              style={{
-                height: 100,
-                background: "#f9fafb",
-                borderRadius: 8,
-                marginBottom: 12,
-              }}
-            ></div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                type="text"
-                placeholder="Type your message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #d1d5db",
-                  background: "#fff",
-                }}
-              />
-              <button
-                style={{
-                  padding: "8px 16px",
-                  background: "#3b82f6",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                Send
-              </button>
-            </div>
-          </div>
-
-          {/* Shared Files */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 24,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: 16 }}>Shared Files</h3>
-              <button
-                style={{
-                  padding: "8px 16px",
-                  background: "#3b82f6",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                Upload File
-              </button>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background: "#f9fafb",
-                borderRadius: 8,
-                padding: "8px 12px",
-              }}
-            >
-              <span style={{ color: "#64748b" }}>. . .</span>
-              <button
-                style={{
-                  background: "transparent",
-                  color: "#64748b",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Download
-              </button>
-            </div>
-          </div>
-
-          {/* Deal Progress */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 12,
-              padding: 16,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-            }}
-          >
-            <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Deal Progress</h3>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {progress.map((item, index) => (
-                <li
-                  key={index}
-                  style={{ marginBottom: 8, display: "flex", alignItems: "center" }}
-                >
-                  <span
-                    style={{
-                      marginRight: 8,
-                      display: "inline-block",
-                      width: 20,
-                      height: 20,
-                      borderRadius: 4,
-                      background: item.checked ? "#dcfce7" : "#e5e7eb",
-                      position: "relative",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => handleCheckboxChange(index)}
-                  >
-                    {item.checked && (
-                      <CheckOutlined
-                        style={{
-                          color: "#16a34a",
-                          position: "absolute",
-                          top: 2,
-                          left: 2,
-                          fontSize: 16,
-                        }}
-                      />
-                    )}
-                  </span>
-                  {item.label}
-                </li>
-              ))}
-            </ul>
-            <button
-              style={{
-                width: "100%",
-                marginTop: 16,
-                padding: "8px",
-                background: "#e5e7eb",
-                color: "#64748b",
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
-            >
-              Mark Deal As Closed
-            </button>
-          </div>
-        </div>
-      </div>
+        )}
+      </Card>
     </div>
   );
 };

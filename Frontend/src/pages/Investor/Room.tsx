@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
-import { fetchMeetings } from "../../services/features/meeting/meetingSlice";
+import { fetchMeetings, signMeetingNda, type MeetingStatus } from "../../services/features/meeting/meetingSlice";
 import { api } from "../../services/constant/axiosInstance";
 import {
     Button,
@@ -55,9 +55,32 @@ const Room: React.FC = () => {
         }
     };
 
-    const handleSignNDA = (meetingId: number) => {
-        message.success(`Đã mở trang ký NDA cho meeting #${meetingId}`);
-        // TODO: mở modal ký NDA hoặc redirect sang trang ký NDA
+    const handleSignNDA = async (meetingId: number) => {
+        if (!authUser) {
+            message.error("Vui lòng đăng nhập để ký NDA");
+            return;
+        }
+
+        try {
+            await dispatch(signMeetingNda({ meetingId, userId: authUser.id })).unwrap();
+            message.success("Ký NDA thành công!");
+            dispatch(fetchMeetings() as any);
+        } catch (err: any) {
+            message.error(err?.message || "Lỗi khi ký NDA");
+        }
+    };
+
+    const getStatusTag = (status?: MeetingStatus) => {
+        switch (status) {
+            case "PENDING":
+                return <Tag color="orange">Chờ xác nhận</Tag>;
+            case "WAITING_NDA":
+                return <Tag color="blue">Chờ ký NDA</Tag>;
+            case "CONFIRMED":
+                return <Tag color="green">Đã xác nhận</Tag>;
+            default:
+                return <Tag>Không xác định</Tag>;
+        }
     };
 
     return (
@@ -215,6 +238,11 @@ const Room: React.FC = () => {
                                         </Tag>
                                     </div>
 
+                                    {/* Status */}
+                                    <div style={{ marginTop: 8 }}>
+                                        {getStatusTag(m.status)}
+                                    </div>
+
                                     {/* Details */}
                                     <Divider style={{ margin: "8px 0" }} />
 
@@ -289,37 +317,42 @@ const Room: React.FC = () => {
                                     align="middle"
                                     style={{ marginTop: 14 }}
                                 >
-                                    <Col span={12}>
-                                        <Button
-                                            icon={<EditOutlined />}
-                                            onClick={() => handleSignNDA(m.id)}
-                                            block
-                                            style={{
-                                                height: 38,
-                                                borderRadius: 8,
-                                                fontWeight: 500,
-                                                fontSize: 13.5,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                gap: 6,
-                                            }}
-                                        >
-                                            Ký NDA
-                                        </Button>
-                                    </Col>
-                                    <Col span={12}>
+                                    {m.status === "WAITING_NDA" && m.investorStatus !== "CONFIRMED" && (
+                                        <Col span={12}>
+                                            <Button
+                                                icon={<EditOutlined />}
+                                                onClick={() => handleSignNDA(m.id)}
+                                                block
+                                                style={{
+                                                    height: 38,
+                                                    borderRadius: 8,
+                                                    fontWeight: 500,
+                                                    fontSize: 13.5,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    gap: 6,
+                                                }}
+                                            >
+                                                Ký NDA
+                                            </Button>
+                                        </Col>
+                                    )}
+                                    <Col span={m.status === "CONFIRMED" ? 24 : 12}>
                                         <Button
                                             type="primary"
                                             icon={<VideoCameraOutlined />}
                                             onClick={() => handleJoin(m.id)}
+                                            disabled={m.status !== "CONFIRMED"}
                                             block
                                             style={{
                                                 height: 38,
                                                 borderRadius: 8,
                                                 fontWeight: 600,
                                                 fontSize: 13.5,
-                                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                background: m.status === "CONFIRMED" 
+                                                    ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
+                                                    : "#d9d9d9",
                                                 border: "none",
                                                 display: "flex",
                                                 alignItems: "center",
@@ -327,7 +360,7 @@ const Room: React.FC = () => {
                                                 gap: 6,
                                             }}
                                         >
-                                            Join Meeting
+                                            {m.status === "CONFIRMED" ? "Join Meeting" : "Chưa thể join"}
                                         </Button>
                                     </Col>
                                 </Row>
