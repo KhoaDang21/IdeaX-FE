@@ -17,9 +17,17 @@ export interface Meeting {
   projectName?: string;
   startupId?: number;
   startupName?: string;
+  // additional fields returned by backend for convenience
+  startupFullName?: string;
+  startupEmail?: string;
+  investorFullName?: string;
+  investorEmail?: string;
+  createdByEmail?: string;
   status?: MeetingStatus;
   investorStatus?: MeetingStatus;
   startupStatus?: MeetingStatus;
+  investorNdaSigned?: boolean;
+  startupNdaSigned?: boolean;
 }
 
 interface MeetingState {
@@ -65,6 +73,26 @@ export const fetchMeetingsByStartup = createAsyncThunk<Meeting[], number>(
   }
 );
 
+// Lấy danh sách meetings theo nhiều project (dành cho startup)
+export const fetchMeetingsByProjects = createAsyncThunk<Meeting[], number[]>(
+  "meetings/fetchByProjects",
+  async (projectIds, { rejectWithValue }) => {
+    try {
+      // Gọi từng project endpoint rồi gộp kết quả
+      const results = await Promise.all(
+        projectIds.map((id) => api.get(`/api/meetings/project/${id}`))
+      );
+      // res.data có thể là mảng meetings
+      const combined: Meeting[] = results.flatMap((r: any) => r.data || []);
+      return combined;
+    } catch (err: any) {
+      return rejectWithValue(
+        err.response?.data || "Error fetching meetings by projects"
+      );
+    }
+  }
+);
+
 // Tạo meeting mới
 export const createMeeting = createAsyncThunk<Meeting, Omit<Meeting, "id">>(
   "meetings/create",
@@ -97,7 +125,9 @@ export const confirmMeeting = createAsyncThunk<
   { meetingId: number; startupId: number }
 >("meetings/confirm", async ({ meetingId, startupId }, { rejectWithValue }) => {
   try {
-    const res = await api.post(`/api/meetings/${meetingId}/confirm/${startupId}`);
+    const res = await api.post(
+      `/api/meetings/${meetingId}/confirm/${startupId}`
+    );
     return res.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data || "Error confirming meeting");
@@ -114,6 +144,19 @@ export const signMeetingNda = createAsyncThunk<
     return res.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data || "Error signing NDA");
+  }
+});
+
+// Join meeting (get Jitsi URL)
+export const joinMeeting = createAsyncThunk<
+  string,
+  { meetingId: number; userId: number }
+>("meetings/join", async ({ meetingId, userId }, { rejectWithValue }) => {
+  try {
+    const res = await api.get(`/api/meetings/${meetingId}/join/${userId}`);
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data || "Error joining meeting");
   }
 });
 
@@ -186,6 +229,20 @@ const meetingSlice = createSlice({
         state.meetings = action.payload;
       })
       .addCase(fetchMeetingsByStartup.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      // Fetch by projects (startup) - aggregate meetings from multiple projects
+      .addCase(fetchMeetingsByProjects.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMeetingsByProjects.fulfilled, (state, action) => {
+        state.loading = false;
+        state.meetings = action.payload;
+      })
+      .addCase(fetchMeetingsByProjects.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
