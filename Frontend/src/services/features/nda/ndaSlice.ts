@@ -4,8 +4,8 @@ import { api } from "../../constant/axiosInstance";
 // ===== Types =====
 export interface NdaTemplate {
   id: number;
-  name: string;
-  contentUrl: string;
+  fileUrl: string;
+  uploadedAt: string;
 }
 
 export interface SignedNda {
@@ -41,7 +41,9 @@ export const fetchNdaTemplates = createAsyncThunk<NdaTemplate[]>(
       const res = await api.get("/api/nda/templates");
       return res.data;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data || "Error fetching NDA templates");
+      return rejectWithValue(
+        err.response?.data || "Error fetching NDA templates"
+      );
     }
   }
 );

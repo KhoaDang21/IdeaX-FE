@@ -2,15 +2,32 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { api } from "../../constant/axiosInstance";
 
 // ===== Types =====
+export type MeetingStatus = "PENDING" | "WAITING_NDA" | "CONFIRMED";
+
 export interface Meeting {
   id: number;
   roomCode: string;
   topic: string;
-  startTime: string;
-  endTime: string;
+  meetingTime: string;
+  description?: string;
   createdById: number;
   createdByName?: string;
   recordUrl?: string;
+  projectId?: number;
+  projectName?: string;
+  startupId?: number;
+  startupName?: string;
+  // additional fields returned by backend for convenience
+  startupFullName?: string;
+  startupEmail?: string;
+  investorFullName?: string;
+  investorEmail?: string;
+  createdByEmail?: string;
+  status?: MeetingStatus;
+  investorStatus?: MeetingStatus;
+  startupStatus?: MeetingStatus;
+  investorNdaSigned?: boolean;
+  startupNdaSigned?: boolean;
 }
 
 interface MeetingState {
@@ -30,7 +47,7 @@ const initialState: MeetingState = {
 
 // ===== Async Thunks =====
 
-// Lấy danh sách meetings
+// Lấy danh sách meetings (cho investor)
 export const fetchMeetings = createAsyncThunk<Meeting[]>(
   "meetings/fetchAll",
   async (_, { rejectWithValue }) => {
@@ -39,6 +56,39 @@ export const fetchMeetings = createAsyncThunk<Meeting[]>(
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data || "Error fetching meetings");
+    }
+  }
+);
+
+// Lấy danh sách meetings theo startup
+export const fetchMeetingsByStartup = createAsyncThunk<Meeting[], number>(
+  "meetings/fetchByStartup",
+  async (startupId, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/api/meetings/startup/${startupId}`);
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data || "Error fetching meetings");
+    }
+  }
+);
+
+// Lấy danh sách meetings theo nhiều project (dành cho startup)
+export const fetchMeetingsByProjects = createAsyncThunk<Meeting[], number[]>(
+  "meetings/fetchByProjects",
+  async (projectIds, { rejectWithValue }) => {
+    try {
+      // Gọi từng project endpoint rồi gộp kết quả
+      const results = await Promise.all(
+        projectIds.map((id) => api.get(`/api/meetings/project/${id}`))
+      );
+      // res.data có thể là mảng meetings
+      const combined: Meeting[] = results.flatMap((r: any) => r.data || []);
+      return combined;
+    } catch (err: any) {
+      return rejectWithValue(
+        err.response?.data || "Error fetching meetings by projects"
+      );
     }
   }
 );
@@ -66,6 +116,47 @@ export const recordMeeting = createAsyncThunk<
     return res.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data || "Error recording meeting");
+  }
+});
+
+// Startup confirm meeting
+export const confirmMeeting = createAsyncThunk<
+  Meeting,
+  { meetingId: number; startupId: number }
+>("meetings/confirm", async ({ meetingId, startupId }, { rejectWithValue }) => {
+  try {
+    const res = await api.post(
+      `/api/meetings/${meetingId}/confirm/${startupId}`
+    );
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data || "Error confirming meeting");
+  }
+});
+
+// Ký NDA cho meeting
+export const signMeetingNda = createAsyncThunk<
+  Meeting,
+  { meetingId: number; userId: number }
+>("meetings/signNda", async ({ meetingId, userId }, { rejectWithValue }) => {
+  try {
+    const res = await api.post(`/api/meetings/${meetingId}/sign-nda/${userId}`);
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data || "Error signing NDA");
+  }
+});
+
+// Join meeting (get Jitsi URL)
+export const joinMeeting = createAsyncThunk<
+  string,
+  { meetingId: number; userId: number }
+>("meetings/join", async ({ meetingId, userId }, { rejectWithValue }) => {
+  try {
+    const res = await api.get(`/api/meetings/${meetingId}/join/${userId}`);
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data || "Error joining meeting");
   }
 });
 
@@ -124,6 +215,72 @@ const meetingSlice = createSlice({
         state.currentMeeting = updated;
       })
       .addCase(recordMeeting.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      // Fetch by startup
+      .addCase(fetchMeetingsByStartup.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMeetingsByStartup.fulfilled, (state, action) => {
+        state.loading = false;
+        state.meetings = action.payload;
+      })
+      .addCase(fetchMeetingsByStartup.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      // Fetch by projects (startup) - aggregate meetings from multiple projects
+      .addCase(fetchMeetingsByProjects.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMeetingsByProjects.fulfilled, (state, action) => {
+        state.loading = false;
+        state.meetings = action.payload;
+      })
+      .addCase(fetchMeetingsByProjects.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      // Confirm
+      .addCase(confirmMeeting.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(confirmMeeting.fulfilled, (state, action) => {
+        state.loading = false;
+        const updated = action.payload;
+        const index = state.meetings.findIndex((m) => m.id === updated.id);
+        if (index !== -1) {
+          state.meetings[index] = updated;
+        }
+        state.currentMeeting = updated;
+      })
+      .addCase(confirmMeeting.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      // Sign NDA
+      .addCase(signMeetingNda.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(signMeetingNda.fulfilled, (state, action) => {
+        state.loading = false;
+        const updated = action.payload;
+        const index = state.meetings.findIndex((m) => m.id === updated.id);
+        if (index !== -1) {
+          state.meetings[index] = updated;
+        }
+        state.currentMeeting = updated;
+      })
+      .addCase(signMeetingNda.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
