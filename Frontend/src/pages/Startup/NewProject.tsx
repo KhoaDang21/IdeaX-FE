@@ -1,7 +1,7 @@
 import React, { useState, type ChangeEvent, type FocusEvent } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { App } from "antd"; // Import App for message context
+import { App } from "antd";
 import { createProject } from "../../services/features/project/projectSlice";
 import { type AppDispatch } from "../../store";
 import type { ProjectFormState } from "../../interfaces/project";
@@ -11,9 +11,8 @@ import { logActivity } from "../../utils/activityLogger";
 import { NewProjectHeader } from "../../components/startup/newproject/NewProjectHeader";
 import { ProjectInfoForm } from "../../components/startup/newproject/ProjectInfoForm";
 import { DocumentsMediaForm } from "../../components/startup/newproject/DocumentsMediaForm";
-import { PrivacyLegalSection } from "../../components/startup/newproject/PrivacyLegalSection";
 
-// Interface for validation errors (giữ lại hoặc export/import từ file riêng)
+// ... (Interface ValidationErrors và Type FieldName giữ nguyên) ...
 export interface ValidationErrors {
   [key: string]: string | undefined;
   projectName?: string;
@@ -30,16 +29,36 @@ export interface ValidationErrors {
   businessPlan?: string;
   financialProjection?: string;
 }
-
-// Type for field names (giữ lại hoặc export/import từ file riêng)
 type FieldName = keyof ValidationErrors;
+
+const fieldsByStep: FieldName[][] = [
+  // Bước 0: ProjectInfoForm
+  [
+    "projectName",
+    "category",
+    "customCategory",
+    "fundingStage",
+    "fundingRange",
+    "teamSize",
+    "location",
+    "website",
+    "description",
+  ],
+  // Bước 1: DocumentsMediaForm
+  ["pitchDeck", "pitchVideo", "businessPlan", "financialProjection"],
+];
+
+const stepTitles = ["Project Information", "Documents & Media"];
 
 const SubmitNewProject: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const { message } = App.useApp(); // Use Ant Design's message hook
+  const { message } = App.useApp();
 
   // --- STATE MANAGEMENT ---
+  const [currentStep, setCurrentStep] = useState(0);
+  const totalSteps = stepTitles.length;
+
   const [formData, setFormData] = useState<ProjectFormState>({
     projectName: "",
     category: "",
@@ -59,11 +78,11 @@ const SubmitNewProject: React.FC = () => {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  // --- VALIDATION LOGIC --- (Giữ nguyên)
+  // --- VALIDATION LOGIC --- (Giữ nguyên không đổi)
   const validateField = (
     name: FieldName,
     value: any,
-    currentFormData: ProjectFormState, // Pass current form data for context
+    currentFormData: ProjectFormState,
     file?: File | null
   ): string => {
     switch (name) {
@@ -117,7 +136,7 @@ const SubmitNewProject: React.FC = () => {
         if (value.trim().length > 2000)
           return "Description must be less than 2000 characters";
         return "";
-      // File validations (only check if file is provided)
+      // File validations
       case "pitchDeck":
         return file
           ? validateFile(file, ["pdf"], 10 * 1024 * 1024)
@@ -157,102 +176,66 @@ const SubmitNewProject: React.FC = () => {
   const isValidUrl = (url: string): boolean => {
     try {
       new URL(url);
-      // Check if protocol is http or https
       return url.startsWith("http:") || url.startsWith("https:");
     } catch {
       return false;
     }
   };
 
-  const validateForm = (currentFormData: ProjectFormState): boolean => {
-    const newErrors: ValidationErrors = {
-      projectName: validateField(
-        "projectName",
-        currentFormData.projectName,
-        currentFormData
-      ),
-      category: validateField(
-        "category",
-        currentFormData.category,
-        currentFormData
-      ),
-      customCategory: validateField(
-        "customCategory",
-        currentFormData.customCategory,
-        currentFormData
-      ),
-      fundingStage: validateField(
-        "fundingStage",
-        currentFormData.fundingStage,
-        currentFormData
-      ),
-      fundingRange: validateField(
-        "fundingRange",
-        currentFormData.fundingRange,
-        currentFormData
-      ),
-      teamSize: validateField(
-        "teamSize",
-        currentFormData.teamSize,
-        currentFormData
-      ),
-      location: validateField(
-        "location",
-        currentFormData.location,
-        currentFormData
-      ),
-      website: validateField(
-        "website",
-        currentFormData.website,
-        currentFormData
-      ),
-      description: validateField(
-        "description",
-        currentFormData.description,
-        currentFormData
-      ),
-      pitchDeck: validateField(
-        "pitchDeck",
-        "",
-        currentFormData,
-        currentFormData.pitchDeck
-      ),
-      pitchVideo: validateField(
-        "pitchVideo",
-        "",
-        currentFormData,
-        currentFormData.pitchVideo
-      ),
-      businessPlan: validateField(
-        "businessPlan",
-        "",
-        currentFormData,
-        currentFormData.businessPlan
-      ),
-      financialProjection: validateField(
-        "financialProjection",
-        "",
-        currentFormData,
-        currentFormData.financialProjection
-      ),
-    };
+  const validateCurrentStep = (stepIndex: number): boolean => {
+    const fieldsToValidate = fieldsByStep[stepIndex];
+    if (!fieldsToValidate) return true;
+
+    let isStepValid = true;
+    const newErrors: ValidationErrors = { ...errors };
+    const newTouched: Record<string, boolean> = { ...touched };
+
+    fieldsToValidate.forEach((name) => {
+      const value = formData[name as keyof ProjectFormState];
+      const file = value instanceof File ? value : null;
+      const textValue = value instanceof File ? "" : value;
+
+      const error = validateField(name, textValue, formData, file);
+      newErrors[name] = error;
+      newTouched[name] = true;
+      if (error) {
+        isStepValid = false;
+      }
+    });
+
     setErrors(newErrors);
-    // Return true if there are no error messages (all values are empty strings)
-    return !Object.values(newErrors).some(Boolean); // Check if any error exists
+    setTouched(newTouched);
+    return isStepValid;
   };
 
-  // --- EVENT HANDLERS ---
+  const validateForm = (currentFormData: ProjectFormState): boolean => {
+    let allErrors: ValidationErrors = {};
+    fieldsByStep.forEach((fields) => {
+      fields.forEach((name) => {
+        const value = currentFormData[name as keyof ProjectFormState];
+        const file = value instanceof File ? value : null;
+        const textValue = value instanceof File ? "" : value;
+        const error = validateField(name, textValue, currentFormData, file);
+        if (error) {
+          allErrors[name] = error;
+        }
+      });
+    });
+
+    setErrors(allErrors);
+    return !Object.values(allErrors).some(Boolean);
+  };
+
+  // --- EVENT HANDLERS --- (Giữ nguyên không đổi)
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    // Create a temporary updated form data object for validation context
     const updatedFormData = { ...formData, [name]: value };
-    setFormData(updatedFormData); // Update the state
+    setFormData(updatedFormData);
 
-    // Validate field on change only if it was already touched
     if (touched[name]) {
-      const error = validateField(name as FieldName, value, updatedFormData); // Pass updated data
+      const error = validateField(name as FieldName, value, updatedFormData);
       setErrors((prev) => ({ ...prev, [name]: error }));
     }
   };
@@ -261,35 +244,26 @@ const SubmitNewProject: React.FC = () => {
     e: FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setTouched((prev) => ({ ...prev, [name]: true })); // Mark field as touched
+    setTouched((prev) => ({ ...prev, [name]: true }));
 
-    // Determine if it's a file field based on name convention
-    const isFileField = [
-      "pitchDeck",
-      "pitchVideo",
-      "businessPlan",
-      "financialProjection",
-    ].includes(name);
+    const isFileField = fieldsByStep[1].includes(name as FieldName);
     const fileValue = isFileField
       ? (formData[name as keyof ProjectFormState] as File | null)
       : undefined;
 
-    // Validate field on blur using the current formData state
     const error = validateField(name as FieldName, value, formData, fileValue);
     setErrors((prev) => ({ ...prev, [name]: error }));
   };
 
   const handleFileChange = (
     event: ChangeEvent<HTMLInputElement>,
-    fieldName: keyof ProjectFormState // Use keyof to ensure valid field names
+    fieldName: keyof ProjectFormState
   ) => {
     const file = event.target.files?.[0] || null;
-    // Create updated form data state immediately
     const updatedFormData = { ...formData, [fieldName]: file };
     setFormData(updatedFormData);
-    setTouched((prev) => ({ ...prev, [fieldName]: true })); // Mark as touched
+    setTouched((prev) => ({ ...prev, [fieldName]: true }));
 
-    // Validate the file immediately using the updated state context
     const error = validateField(
       fieldName as FieldName,
       "",
@@ -298,46 +272,61 @@ const SubmitNewProject: React.FC = () => {
     );
     setErrors((prev) => ({ ...prev, [fieldName]: error }));
 
-    // If there's an error and no file is actually selected (e.g., user cancelled),
-    // clear the HTML input value so they can re-select the same file if needed.
     if (error && !file) {
       event.target.value = "";
     }
   };
 
-  const handleCreate = (status: string) => {
-    // Mark all fields as touched to show errors on submit attempt
-    const allFields = Object.keys(formData) as FieldName[];
-    setTouched(
-      allFields.reduce((acc, field) => ({ ...acc, [field]: true }), {})
-    );
+  const handleNext = () => {
+    if (validateCurrentStep(currentStep)) {
+      if (currentStep < totalSteps - 1) {
+        setCurrentStep((prev) => prev + 1);
+        window.scrollTo(0, 0);
+      }
+    } else {
+      message.error("Please fix the errors on this page before proceeding.");
+    }
+  };
 
-    // Validate the entire form using the current formData
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep((prev) => prev - 1);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const handleFinalSubmit = (status: string) => {
+    const allTouched = fieldsByStep
+      .flat()
+      .reduce((acc, field) => ({ ...acc, [field]: true }), {});
+    setTouched(allTouched);
+
     if (!validateForm(formData)) {
       message.error("Please fix the validation errors before submitting.");
+
+      for (let i = 0; i < fieldsByStep.length; i++) {
+        if (!validateCurrentStep(i)) {
+          setCurrentStep(i);
+          break;
+        }
+      }
       return;
     }
 
     // --- FORM SUBMISSION LOGIC --- (Giữ nguyên)
     const submitData = new FormData();
-    // Iterate over formData and append valid data
     Object.entries(formData).forEach(([key, value]) => {
-      // Check if value is not null or undefined
       if (value !== null && value !== undefined) {
         if (value instanceof File) {
-          // Append file with its name
           submitData.append(key, value, value.name);
         } else if (typeof value === "string" && value.trim()) {
-          // Append trimmed non-empty string
           submitData.append(key, value.trim());
         } else if (typeof value !== "string") {
-          // Append numbers or other types (convert to string)
           submitData.append(key, String(value));
         }
-        // Empty strings are implicitly skipped
       }
     });
-    submitData.append("status", status); // Always append status
+    submitData.append("status", status);
 
     setSubmitting(true);
     message.loading({
@@ -349,7 +338,6 @@ const SubmitNewProject: React.FC = () => {
     dispatch(createProject(submitData))
       .unwrap()
       .then((result) => {
-        // Ensure result is not null and has an 'id' property
         if (result && result.id) {
           logActivity({
             action: "Created new project",
@@ -362,7 +350,6 @@ const SubmitNewProject: React.FC = () => {
           });
           navigate("/startup/my-projects");
         } else {
-          // Handle cases where result might be unexpected
           console.error(
             "Project creation result did not contain an ID:",
             result
@@ -371,12 +358,10 @@ const SubmitNewProject: React.FC = () => {
             content: "Project created, but failed to get project ID.",
             key: "createProject",
           });
-          navigate("/startup/my-projects"); // Navigate anyway or handle differently
+          navigate("/startup/my-projects");
         }
       })
       .catch((error: any) => {
-        // Catch specific error type if possible
-        // Attempt to parse a more specific error message if available
         const errorMessage =
           typeof error === "string"
             ? error
@@ -399,12 +384,15 @@ const SubmitNewProject: React.FC = () => {
 
   // --- RENDER ---
   return (
-    // If using App.useApp(), ensure <App> wraps your application root in main.tsx or App.tsx
     <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
+      {/* **ĐÃ THAY ĐỔI**: Xóa props `onCreate` và `isLastStep` */}
       <NewProjectHeader
         submitting={submitting}
-        onCreate={handleCreate}
         onBack={handleBackToProjects}
+        onCreate={function (): void {
+          throw new Error("Function not implemented.");
+        }}
+        isLastStep={false}
       />
       <p style={{ color: "#64748b", marginBottom: 24 }}>
         Create a compelling project profile to attract investors. All fields
@@ -420,25 +408,95 @@ const SubmitNewProject: React.FC = () => {
           boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
         }}
       >
-        {/* Project Information Section */}
-        <ProjectInfoForm
-          formData={formData}
-          errors={errors}
-          touched={touched}
-          handleInputChange={handleInputChange}
-          handleBlur={handleBlur}
-        />
+        <div style={{ marginBottom: 24, textAlign: "center" }}>
+          <h3 style={{ color: "#3b82f6", margin: 0 }}>
+            Step {currentStep + 1} of {totalSteps}: {stepTitles[currentStep]}
+          </h3>
+        </div>
 
-        {/* Documents & Media Section */}
-        <DocumentsMediaForm
-          formData={formData}
-          errors={errors}
-          touched={touched}
-          handleFileChange={handleFileChange}
-        />
+        {currentStep === 0 && (
+          <ProjectInfoForm
+            formData={formData}
+            errors={errors}
+            touched={touched}
+            handleInputChange={handleInputChange}
+            handleBlur={handleBlur}
+          />
+        )}
 
-        {/* Privacy & Legal Section */}
-        <PrivacyLegalSection />
+        {currentStep === 1 && (
+          <DocumentsMediaForm
+            formData={formData}
+            errors={errors}
+            touched={touched}
+            handleFileChange={handleFileChange}
+          />
+        )}
+
+        {/* **ĐÃ THAY ĐỔI**: Nút điều hướng các bước */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 32,
+            paddingTop: 24,
+            borderTop: "1px solid #e5e7eb",
+          }}
+        >
+          <button
+            onClick={handlePrevious}
+            disabled={currentStep === 0 || submitting}
+            style={{
+              padding: "8px 16px",
+              background:
+                currentStep === 0 || submitting ? "#d1d5db" : "#6b7280",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              cursor:
+                currentStep === 0 || submitting ? "not-allowed" : "pointer",
+              opacity: currentStep === 0 ? 0.5 : 1,
+            }}
+          >
+            Previous
+          </button>
+
+          {/* Nút "Next" (Chỉ hiển thị khi KHÔNG phải bước cuối) */}
+          {currentStep < totalSteps - 1 && (
+            <button
+              onClick={handleNext}
+              disabled={submitting}
+              style={{
+                padding: "8px 16px",
+                background: submitting ? "#94a3b8" : "#3b82f6",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              Next
+            </button>
+          )}
+
+          {/* Nút "Submit" (Chỉ hiển thị ở BƯỚC CUỐI) */}
+          {currentStep === totalSteps - 1 && (
+            <button
+              onClick={() => handleFinalSubmit("DRAFT")} // Gọi hàm submit
+              disabled={submitting}
+              style={{
+                padding: "8px 16px",
+                background: submitting ? "#94a3b8" : "#3b82f6", // Style giống nút Next
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              {submitting ? "Submitting..." : "Submit"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
