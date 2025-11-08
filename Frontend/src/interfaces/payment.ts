@@ -21,6 +21,9 @@ export interface WalletResponse {
   accountId: number;
   email: string;
   balance: BigDecimalString;
+  totalDeposits?: BigDecimalString;
+  totalInvested?: BigDecimalString;
+  availableForWithdrawal?: BigDecimalString;
 }
 
 export interface CreatePaymentRequest {
@@ -62,6 +65,8 @@ export interface TransactionResponse {
   status: TransactionStatus;
   paymentId?: number;
   createdAt?: string;
+  // optional fields for UI convenience
+  projectName?: string;
 }
 
 export interface Page<T> {
