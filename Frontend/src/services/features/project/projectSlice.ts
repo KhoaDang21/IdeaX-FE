@@ -77,7 +77,21 @@ export const updateProject = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >("projects/update", async ({ id, data }, { rejectWithValue }) => {
   try {
-    const res = await api.put(`/projects/${id}`, data);
+    // Backend expects multipart/form-data with @ModelAttribute
+    const form = new FormData();
+    Object.entries(data || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      // Append arrays/objects as JSON string for safety unless it's a File/Blob
+      if (value instanceof Blob) {
+        form.append(key, value);
+      } else if (typeof value === "object") {
+        form.append(key, JSON.stringify(value));
+      } else {
+        form.append(key, String(value));
+      }
+    });
+    // Use PUT with FormData; let axios set multipart boundary automatically
+    const res = await api.put(`/projects/${id}`, form);
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
