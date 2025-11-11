@@ -201,7 +201,12 @@ const Payments: React.FC = () => {
                 createDeposit({ amount: Number(values.amount) })
             ).unwrap();
             message.success("Deposit request created. Please complete payment via VNPay");
-            window.open(res.paymentUrl, "_blank", "noopener");
+            const url = res.redirectUrl || res.paymentUrl;
+            if (url) {
+                window.open(url, "_blank", "noopener");
+            } else {
+                message.error("Không tìm thấy URL thanh toán từ cổng thanh toán.");
+            }
             setDepositModalOpen(false);
             depositForm.resetFields();
             await fetchWallet();

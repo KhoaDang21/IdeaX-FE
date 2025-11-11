@@ -8,6 +8,11 @@ export interface DepositRequest {
 export interface DepositResponse {
   transactionId: number;
   paymentUrl: string;
+  // New fields from backend for multi-gateway support
+  redirectUrl?: string;
+  transactionReference?: string;
+  amount?: BigDecimalString;
+  gateway?: string;
 }
 
 export interface WithdrawRequest {
