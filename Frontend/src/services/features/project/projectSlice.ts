@@ -77,7 +77,21 @@ export const updateProject = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >("projects/update", async ({ id, data }, { rejectWithValue }) => {
   try {
-    const res = await api.put(`/projects/${id}`, data);
+    // Backend expects multipart/form-data with @ModelAttribute
+    const form = new FormData();
+    Object.entries(data || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      // Append arrays/objects as JSON string for safety unless it's a File/Blob
+      if (value instanceof Blob) {
+        form.append(key, value);
+      } else if (typeof value === "object") {
+        form.append(key, JSON.stringify(value));
+      } else {
+        form.append(key, String(value));
+      }
+    });
+    // Use PUT with FormData; let axios set multipart boundary automatically
+    const res = await api.put(`/projects/${id}`, form);
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -123,12 +137,17 @@ export const rejectProject = createAsyncThunk<
   Project,
   { id: number; note: string }, // <-- Thay đổi: Từ 'number' thành object
   { rejectValue: string; state: RootState }
->("projects/reject", async ({ id, note }, { rejectWithValue }) => { // <-- Thay đổi: Destructure { id, note }
+>("projects/reject", async ({ id, note }, { rejectWithValue }) => {
+  // <-- Thay đổi: Destructure { id, note }
   try {
     // Thay đổi: Gửi 'note' dưới dạng query param
-    const res = await api.put(`/projects/${id}/reject`, {}, {
-      params: { note } // <-- Thao tác này sẽ thêm "?note=..." vào URL
-    });
+    const res = await api.put(
+      `/projects/${id}/reject`,
+      {},
+      {
+        params: { note },
+      }
+    );
     return res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -244,29 +263,27 @@ export const getMilestonesByProject = createAsyncThunk<
   Milestone[],
   number,
   { rejectValue: string; state: RootState }
->(
-  "milestones/getByProject",
-  async (projectId, { rejectWithValue }) => { // <-- Xóa 'getState'
-    try {
-      // Xóa dòng 'const token = ...'
-      const res = await api.get(`/api/milestones/project/${projectId}`); // <-- Xóa 'headers'
-      
-      // Lấy mảng milestones từ API
-      const milestones: Milestone[] = res.data;
+>("milestones/getByProject", async (projectId, { rejectWithValue }) => {
+  // <-- Xóa 'getState'
+  try {
+    // Xóa dòng 'const token = ...'
+    const res = await api.get(`/api/milestones/project/${projectId}`); // <-- Xóa 'headers'
 
-      // DÙNG .map ĐỂ TRẢ VỀ MỘT MẢNG MỚI,
-      // MỖI MILESTONE ĐỀU ĐƯỢC GẮN THÊM projectId
-      return milestones.map(milestone => ({
-        ...milestone,
-        projectId: projectId // <-- Thêm ID của project vào đây
-      }));
-    } catch (err: any) {
-      return rejectWithValue(
-        err.response?.data?.message || "Failed to get milestones"
-      );
-    }
+    // Lấy mảng milestones từ API
+    const milestones: Milestone[] = res.data;
+
+    // DÙNG .map ĐỂ TRẢ VỀ MỘT MẢNG MỚI,
+    // MỖI MILESTONE ĐỀU ĐƯỢC GẮN THÊM projectId
+    return milestones.map((milestone) => ({
+      ...milestone,
+      projectId: projectId, // <-- Thêm ID của project vào đây
+    }));
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to get milestones"
+    );
   }
-);
+});
 
 // POST /api/milestones/project/{projectId} (unchanged)
 export const createMilestone = createAsyncThunk<
@@ -364,11 +381,13 @@ const projectSlice = createSlice({
       /* MILESTONES CRUD */
       .addCase(getMilestonesByProject.fulfilled, (state, action) => {
         // Tạo 1 Set chứa các ID milestones đã có
-  const existingIds = new Set(state.milestones.map(m => m.id));
-  // Lọc ra các milestones mới chưa có trong state
-  const newMilestones = action.payload.filter(m => !existingIds.has(m.id));
-  // Nối các milestones mới vào state
-  state.milestones.push(...newMilestones);
+        const existingIds = new Set(state.milestones.map((m) => m.id));
+        // Lọc ra các milestones mới chưa có trong state
+        const newMilestones = action.payload.filter(
+          (m) => !existingIds.has(m.id)
+        );
+        // Nối các milestones mới vào state
+        state.milestones.push(...newMilestones);
       })
       .addCase(createMilestone.fulfilled, (state, action) => {
         state.milestones.push(action.payload);

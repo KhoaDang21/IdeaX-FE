@@ -3,6 +3,7 @@ import authReducer from './services/features/auth/authSlice';
 import projectReducer from "./services/features/project/projectSlice";
 import ndaReducer from "./services/features/nda/ndaSlice";
 import meetingReducer from "./services/features/meeting/meetingSlice";
+import paymentReducer from "./services/features/payment/paymentSlice";
 
 const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ const store = configureStore({
     project: projectReducer,
     nda: ndaReducer,
     meeting: meetingReducer,
+    payment: paymentReducer,
   },
 });
 

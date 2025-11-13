@@ -112,7 +112,10 @@ export const recordMeeting = createAsyncThunk<
   { id: number; recordUrl: string }
 >("meetings/record", async ({ id, recordUrl }, { rejectWithValue }) => {
   try {
-    const res = await api.post(`/api/meetings/${id}/record`, { recordUrl });
+    // Backend expects @RequestParam recordUrl, not JSON body
+    const res = await api.post(`/api/meetings/${id}/record`, null, {
+      params: { recordUrl },
+    });
     return res.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data || "Error recording meeting");
