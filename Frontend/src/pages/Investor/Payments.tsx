@@ -29,6 +29,8 @@ import dayjs from "dayjs";
 import type { RootState, AppDispatch } from "../../store";
 import {
     createDeposit,
+    createDepositZaloPay,
+    createDepositMoMo,
     createPayment,
     createWithdraw,
     getMyWallet,
@@ -197,11 +199,23 @@ const Payments: React.FC = () => {
         try {
             const values = await depositForm.validateFields();
             setDepositing(true);
-            const res = await dispatch(
-                createDeposit({ amount: Number(values.amount) })
-            ).unwrap();
-            message.success("Deposit request created. Please complete payment via VNPay");
-            window.open(res.paymentUrl, "_blank", "noopener");
+            const amount = Number(values.amount);
+            const method = values.paymentMethod as string;
+            let res;
+            if (method === "MOMO") {
+                res = await dispatch(createDepositMoMo({ amount, paymentMethod: method })).unwrap();
+            } else if (method === "ZALOPAY") {
+                res = await dispatch(createDepositZaloPay({ amount, paymentMethod: method })).unwrap();
+            } else {
+                res = await dispatch(createDeposit({ amount, paymentMethod: "VNPAY" })).unwrap();
+            }
+            message.success(`Deposit request created. Redirecting to ${res.gateway ?? method ?? "payment gateway"}`);
+            const url = res.redirectUrl || res.paymentUrl;
+            if (url) {
+                window.open(url, "_blank", "noopener");
+            } else {
+                message.error("Không tìm thấy URL thanh toán từ cổng thanh toán.");
+            }
             setDepositModalOpen(false);
             depositForm.resetFields();
             await fetchWallet();
@@ -553,7 +567,7 @@ const Payments: React.FC = () => {
                         }}
                         onClick={() => setDepositModalOpen(true)}
                     >
-                        Deposit via VNPay
+                        Deposit
                     </Button>
                     <Button
                         size="large"
@@ -855,9 +869,23 @@ const Payments: React.FC = () => {
                             parser={parseNumberInput}
                         />
                     </Form.Item>
+                    <Form.Item
+                        label="Payment Method"
+                        name="paymentMethod"
+                        rules={[{ required: true, message: "Please select a payment method" }]}
+                    >
+                        <Select
+                            placeholder="Select gateway"
+                            options={[
+                                { label: "VNPay", value: "VNPAY" },
+                                { label: "MoMo", value: "MOMO" },
+                                { label: "ZaloPay", value: "ZALOPAY" },
+                            ]}
+                        />
+                    </Form.Item>
                 </Form>
                 <Text type="secondary">
-                    You will be redirected to VNPay after creating the request.
+                    You will be redirected to the selected payment gateway.
                 </Text>
             </Modal>
 

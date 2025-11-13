@@ -19,6 +19,7 @@ export interface SignedNda {
 interface NdaState {
   templates: NdaTemplate[];
   signedNda?: SignedNda;
+  hasSigned?: boolean;
   loading: boolean;
   error: string | null;
 }
@@ -79,15 +80,13 @@ export const signNda = createAsyncThunk<
 });
 
 // Check NDA đã ký chưa
-export const checkNda = createAsyncThunk<
-  SignedNda,
-  { userId: number; ndaTemplateId: number }
->("nda/check", async ({ userId, ndaTemplateId }, { rejectWithValue }) => {
+export const checkNda = createAsyncThunk<boolean, { userId: number; ndaTemplateId: number }>(
+  "nda/check",
+  async ({ userId, ndaTemplateId }, { rejectWithValue }) => {
   try {
-    const res = await api.get(
-      `/api/nda/check?userId=${userId}&ndaTemplateId=${ndaTemplateId}`
-    );
-    return res.data;
+    const res = await api.get(`/api/nda/check?userId=${userId}&ndaTemplateId=${ndaTemplateId}`);
+    // Backend returns boolean
+    return Boolean(res.data);
   } catch (err: any) {
     return rejectWithValue(err.response?.data || "Error checking NDA");
   }
@@ -149,7 +148,7 @@ const ndaSlice = createSlice({
       })
       .addCase(checkNda.fulfilled, (state, action) => {
         state.loading = false;
-        state.signedNda = action.payload;
+        state.hasSigned = action.payload;
       })
       .addCase(checkNda.rejected, (state, action) => {
         state.loading = false;

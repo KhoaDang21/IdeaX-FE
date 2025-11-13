@@ -144,6 +144,42 @@ export const createDeposit = createAsyncThunk<
   }
 });
 
+export const createDepositZaloPay = createAsyncThunk<
+  DepositResponse,
+  DepositRequest,
+  { rejectValue: string }
+>("payment/createDepositZaloPay", async (payload, { rejectWithValue }) => {
+  try {
+    const res = await api.post<DepositResponse>(`${BASE}/wallet/deposit/zalopay`, {
+      ...payload,
+      amount: Number(payload.amount),
+    });
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to create ZaloPay deposit"
+    );
+  }
+});
+
+export const createDepositMoMo = createAsyncThunk<
+  DepositResponse,
+  DepositRequest,
+  { rejectValue: string }
+>("payment/createDepositMoMo", async (payload, { rejectWithValue }) => {
+  try {
+    const res = await api.post<DepositResponse>(`${BASE}/wallet/deposit/momo`, {
+      ...payload,
+      amount: Number(payload.amount),
+    });
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to create MoMo deposit"
+    );
+  }
+});
+
 export const createWithdraw = createAsyncThunk<
   string,
   WithdrawRequest,
