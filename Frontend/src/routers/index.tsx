@@ -1,67 +1,74 @@
+import React, { Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
-import Home from "../pages/Home";
-import Login from "../pages/Login";
-import StartupsJoin from "../pages/StartupsJoin";
-import InvestorsJoin from "../pages/InvestorsJoin";
 import App from "../App";
-import StartupDashboard from "../pages/Startup/Dashboard";
-import MyProjects from "../pages/Startup/MyProjects";
-import Roommeet from "../pages/Startup/Roommeet";
-import Profile from "../pages/Startup/Profile";
-import Payment from "../pages/Startup/Payment";
-import SubmitNewProject from "../pages/Startup/NewProject";
 import StartupLayout from "../components/StartupLayout";
-import FindProjects from "../pages/Investor/FindProjects";
-import ProgressTracking from "../pages/Investor/ProgressTracking";
-import InvestedProjects from "../pages/Investor/InvestedProjects";
-import Payments from "../pages/Investor/Payments";
 import InvestorLayout from "../components/InvestorLayout";
-import UserManagement from "../pages/Admin/UserManagement";
-import ProjectManagement from "../pages/Admin/ProjectManagement";
-import FinancialManagement from "../pages/Admin/FinancialManagement";
-import RoomAndContract from "../pages/Admin/RoomAndContract";
 import AdminLayout from "../components/AdminLayout";
-import ProjectDetails from "../pages/Startup/ProjectDetails";
-import ProfileInvestor from "../pages/Investor/ProfileInvestor";
-import Room from "../pages/Investor/Room";
-import ProjectDetailsadmin from "../pages/Admin/ProjectDetails";
+
+// Lazy-loaded pages to split bundles and reduce main chunk size
+const Home = React.lazy(() => import("../pages/Home"));
+const Login = React.lazy(() => import("../pages/Login"));
+const StartupsJoin = React.lazy(() => import("../pages/StartupsJoin"));
+const InvestorsJoin = React.lazy(() => import("../pages/InvestorsJoin"));
+const StartupDashboard = React.lazy(() => import("../pages/Startup/Dashboard"));
+const MyProjects = React.lazy(() => import("../pages/Startup/MyProjects"));
+const Roommeet = React.lazy(() => import("../pages/Startup/Roommeet"));
+const Profile = React.lazy(() => import("../pages/Startup/Profile"));
+const Payment = React.lazy(() => import("../pages/Startup/Payment"));
+const SubmitNewProject = React.lazy(() => import("../pages/Startup/NewProject"));
+const FindProjects = React.lazy(() => import("../pages/Investor/FindProjects"));
+const ProgressTracking = React.lazy(() => import("../pages/Investor/ProgressTracking"));
+const InvestedProjects = React.lazy(() => import("../pages/Investor/InvestedProjects"));
+const Payments = React.lazy(() => import("../pages/Investor/Payments"));
+const UserManagement = React.lazy(() => import("../pages/Admin/UserManagement"));
+const ProjectManagement = React.lazy(() => import("../pages/Admin/ProjectManagement"));
+const FinancialManagement = React.lazy(() => import("../pages/Admin/FinancialManagement"));
+const RoomAndContract = React.lazy(() => import("../pages/Admin/RoomAndContract"));
+const ProjectDetails = React.lazy(() => import("../pages/Startup/ProjectDetails"));
+const ProfileInvestor = React.lazy(() => import("../pages/Investor/ProfileInvestor"));
+const Room = React.lazy(() => import("../pages/Investor/Room"));
+const ProjectDetailsadmin = React.lazy(() => import("../pages/Admin/ProjectDetails"));
 
 // admin layout moved to components/AdminLayout
 
 export default function AppRoutes() {
+  const Fallback = <div style={{ padding: 20 }}>Đang tải...</div>;
+
   return (
-    <Routes>
-      <Route element={<App />}>
-        <Route index element={<Home />} />
-        <Route path="start" element={<StartupsJoin />} />
-        <Route path="start/investor" element={<InvestorsJoin />} />
-      </Route>
-      <Route path="/login" element={<Login />} />
-      <Route path="/admin" element={<AdminLayout />}>
-        <Route path="user-management" element={<UserManagement />} />
-        <Route path="project-management" element={<ProjectManagement />} />
-        <Route path="financial-management" element={<FinancialManagement />} />
-        <Route path="room-and-contract" element={<RoomAndContract />} />
-        <Route path="projects/:id" element={<ProjectDetailsadmin />} />
-      </Route>
-      <Route path="/startup" element={<StartupLayout />}>
-        <Route path="dashboard" element={<StartupDashboard />} />
-        <Route path="my-projects" element={<MyProjects />} />
-        <Route path="roommeet" element={<Roommeet />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="payment" element={<Payment />} />
-        <Route path="new-project" element={<SubmitNewProject />} />
-        <Route path="projects/:id" element={<ProjectDetails />} />
-      </Route>
-      <Route path="/investor" element={<InvestorLayout />}>
-        <Route path="find-projects" element={<FindProjects />} />
-        <Route path="progress-tracking" element={<ProgressTracking />} />
-        <Route path="invested-projects" element={<InvestedProjects />} />
-        <Route path="room" element={<Room />} />
-        <Route path="payments" element={<Payments />} />
-        <Route path="profile-investor" element={<ProfileInvestor />} />
-      </Route>
-      <Route path="*" element={<Home />} />
-    </Routes>
+    <Suspense fallback={Fallback}>
+      <Routes>
+        <Route element={<App />}>
+          <Route index element={<Home />} />
+          <Route path="start" element={<StartupsJoin />} />
+          <Route path="start/investor" element={<InvestorsJoin />} />
+        </Route>
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route path="user-management" element={<UserManagement />} />
+          <Route path="project-management" element={<ProjectManagement />} />
+          <Route path="financial-management" element={<FinancialManagement />} />
+          <Route path="room-and-contract" element={<RoomAndContract />} />
+          <Route path="projects/:id" element={<ProjectDetailsadmin />} />
+        </Route>
+        <Route path="/startup" element={<StartupLayout />}>
+          <Route path="dashboard" element={<StartupDashboard />} />
+          <Route path="my-projects" element={<MyProjects />} />
+          <Route path="roommeet" element={<Roommeet />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="payment" element={<Payment />} />
+          <Route path="new-project" element={<SubmitNewProject />} />
+          <Route path="projects/:id" element={<ProjectDetails />} />
+        </Route>
+        <Route path="/investor" element={<InvestorLayout />}>
+          <Route path="find-projects" element={<FindProjects />} />
+          <Route path="progress-tracking" element={<ProgressTracking />} />
+          <Route path="invested-projects" element={<InvestedProjects />} />
+          <Route path="room" element={<Room />} />
+          <Route path="payments" element={<Payments />} />
+          <Route path="profile-investor" element={<ProfileInvestor />} />
+        </Route>
+        <Route path="*" element={<Home />} />
+      </Routes>
+    </Suspense>
   );
 }
