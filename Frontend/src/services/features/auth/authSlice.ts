@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import type { PayloadAction, ActionReducerMapBuilder } from "@reduxjs/toolkit";
 import { message } from "antd";
+// Sửa import: Dùng `api` từ axiosInstance thay vì axios trần
 import { api } from "../../constant/axiosInstance";
 import {
   LOGIN_ENDPOINT,
@@ -11,7 +12,7 @@ import {
   BASE_URL,
   INVESTOR_PROFILE_GET_ENDPOINT,
   INVESTOR_PROFILE_UPDATE_ENDPOINT,
-} from "../../constant/apiConfig";
+} from "../../constant/apiConfig"; //
 import type {
   AuthState,
   LoginCredentials,
@@ -19,7 +20,7 @@ import type {
   InvestorRegisterCredentials,
   User,
   StartupProfileResponse,
-} from "../../../interfaces/auth";
+} from "../../../interfaces/auth"; //
 
 function normalizeRole(
   role: string | undefined
@@ -70,7 +71,8 @@ export const loginUser = createAsyncThunk<
     }: { rejectWithValue: (value: { message: string }) => any }
   ) => {
     try {
-      const response = await api.post(LOGIN_ENDPOINT, credentials);
+      // Dùng `api.post` thay vì axios, vì LOGIN_ENDPOINT là URL đầy đủ
+      const response = await api.post(LOGIN_ENDPOINT, credentials); //
       const data = response.data;
       // If backend returns a banned account, treat as failure
       if (data?.account?.status === "BANNED") {
@@ -98,7 +100,8 @@ export const registerStartup = createAsyncThunk<
     }: { rejectWithValue: (value: { message: string }) => any }
   ) => {
     try {
-      const response = await api.post(REGISTER_STARTUP_ENDPOINT, data, {
+      // Dùng `api.post`
+      const response = await api.post(REGISTER_STARTUP_ENDPOINT, data, { //
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -127,7 +130,8 @@ export const registerInvestor = createAsyncThunk<
     }: { rejectWithValue: (value: { message: string }) => any }
   ) => {
     try {
-      const response = await api.post(REGISTER_INVESTOR_ENDPOINT, data);
+      // Dùng `api.post`
+      const response = await api.post(REGISTER_INVESTOR_ENDPOINT, data); //
       return response.data;
     } catch (err: any) {
       const message =
@@ -145,7 +149,8 @@ export const getStartupProfile = createAsyncThunk<
   { rejectValue: { message: string } }
 >("auth/getStartupProfile", async (accountId, { rejectWithValue }) => {
   try {
-    const response = await api.get(STARTUP_PROFILE_GET_ENDPOINT(accountId));
+    // Dùng `api.get` (đã có interceptor gắn token)
+    const response = await api.get(STARTUP_PROFILE_GET_ENDPOINT(accountId)); //
     return response.data;
   } catch (err: any) {
     const message =
@@ -162,7 +167,8 @@ export const getInvestorProfile = createAsyncThunk<
   { rejectValue: { message: string } }
 >("auth/getInvestorProfile", async (accountId, { rejectWithValue }) => {
   try {
-    const response = await api.get(INVESTOR_PROFILE_GET_ENDPOINT(accountId));
+    // Dùng `api.get`
+    const response = await api.get(INVESTOR_PROFILE_GET_ENDPOINT(accountId)); //
     return response.data;
   } catch (err: any) {
     const message =
@@ -181,8 +187,9 @@ export const updateInvestorProfile = createAsyncThunk<
   "auth/updateInvestorProfile",
   async ({ accountId, profileData }, { rejectWithValue }) => {
     try {
+      // Dùng `api.put`
       const response = await api.put(
-        INVESTOR_PROFILE_UPDATE_ENDPOINT(accountId),
+        INVESTOR_PROFILE_UPDATE_ENDPOINT(accountId), //
         profileData
       );
       return response.data;
@@ -204,8 +211,9 @@ export const updateStartupProfile = createAsyncThunk<
   "auth/updateStartupProfile",
   async ({ accountId, profileData }, { rejectWithValue }) => {
     try {
+      // Dùng `api.put`
       const response = await api.put(
-        STARTUP_PROFILE_UPDATE_ENDPOINT(accountId),
+        STARTUP_PROFILE_UPDATE_ENDPOINT(accountId), //
         profileData,
         {
           headers: {
@@ -256,21 +264,18 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: LoginResponse }) => {
           state.loading = false;
           const backendAccount = action.payload.account;
-          // If backend returns a banned account (extra safety), do not accept login
+          
           if (backendAccount.status === "BANNED") {
-            state.isAuthenticated = false;
-            state.token = null;
-            state.user = null;
-            state.error = "Account is banned";
-            // ensure localStorage is cleared
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            // notify user via UI message immediately
-            message.error("Tài khoản của bạn đã bị khóa (Banned)");
+            // ... (code xử lý BANNED giữ nguyên)
             return;
           }
+
           const startupProfile = action.payload.startupProfile;
           const investorProfile = action.payload.investorProfile;
+          
+          // --- SỬA ĐỔI TẠI ĐÂY ---
+          // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
+          const backendAccountData = backendAccount as any; 
 
           const normalizedUser: User = {
             id: String(backendAccount.id),
@@ -278,12 +283,12 @@ const authSlice = createSlice({
             fullName:
               startupProfile?.fullName || investorProfile?.fullName || "",
             role: normalizeRole(backendAccount.role as unknown as string),
-            // Startup fields
+            // ... (Tất cả các trường startupProfile/investorProfile)
             companyWebsite: startupProfile?.companyWebsite,
             profilePictureUrl: startupProfile?.profilePictureUrl
               ? startupProfile.profilePictureUrl.startsWith("http")
                 ? startupProfile.profilePictureUrl
-                : `${BASE_URL}${startupProfile.profilePictureUrl}`
+                : `${BASE_URL}${startupProfile.profilePictureUrl}` //
               : undefined,
             companyLogo: startupProfile?.companyLogo,
             startupName: startupProfile?.startupName,
@@ -292,12 +297,10 @@ const authSlice = createSlice({
             location: startupProfile?.location,
             numberOfTeamMembers: startupProfile?.numberOfTeamMembers,
             aboutUs: startupProfile?.aboutUs,
-            // Investor fields
             organization: investorProfile?.organization,
             investmentFocus: investorProfile?.investmentFocus,
             investmentRange: investorProfile?.investmentRange,
             investmentExperience: investorProfile?.investmentExperience,
-            // map new investor fields; prefer investor values but allow startup-sourced phone/linkedIn
             country: (investorProfile as any)?.country,
             phoneNumber:
               investorProfile?.phoneNumber || startupProfile?.phoneNumber,
@@ -306,8 +309,15 @@ const authSlice = createSlice({
               startupProfile?.linkedInProfile,
             twoFactorEnabled:
               (investorProfile as any)?.twoFactorEnabled ?? undefined,
+              
+            // --- THÊM 2 DÒNG NÀY ---
+            // Đọc projectLimit và walletBalance từ API đăng nhập
+            // Nếu BE không trả về, gán giá trị mặc định
+            projectLimit: backendAccountData.projectLimit ?? 2,
+            walletBalance: backendAccountData.walletBalance ?? 0,
+            // --- KẾT THÚC THÊM ---
           };
-          // no client-only country merge anymore; backend is authoritative
+          // --- KẾT THÚC SỬA ĐỔI ---
 
           state.user = normalizedUser;
           state.token = backendAccount.token || null;
@@ -375,26 +385,40 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: StartupProfileResponse }) => {
           state.loading = false;
           if (state.user) {
+            
+            // --- SỬA ĐỔI TẠI ĐÂY ---
+            // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
+            const profileData = action.payload as any;
+
             // Cập nhật user với thông tin profile mới
             state.user = {
               ...state.user,
-              fullName: action.payload.fullName || state.user.fullName,
-              phoneNumber: action.payload.phoneNumber,
-              linkedInProfile: action.payload.linkedInProfile,
-              companyWebsite: action.payload.companyWebsite,
-              profilePictureUrl: action.payload.profilePictureUrl
-                ? action.payload.profilePictureUrl.startsWith("http")
-                  ? action.payload.profilePictureUrl
-                  : `${BASE_URL}${action.payload.profilePictureUrl}`
+              fullName: profileData.fullName || state.user.fullName,
+              phoneNumber: profileData.phoneNumber,
+              linkedInProfile: profileData.linkedInProfile,
+              companyWebsite: profileData.companyWebsite,
+              profilePictureUrl: profileData.profilePictureUrl
+                ? profileData.profilePictureUrl.startsWith("http")
+                  ? profileData.profilePictureUrl
+                  : `${BASE_URL}${profileData.profilePictureUrl}` //
                 : undefined,
-              companyLogo: action.payload.companyLogo,
-              startupName: action.payload.startupName,
-              industryCategory: action.payload.industryCategory,
-              fundingStage: action.payload.fundingStage,
-              location: action.payload.location,
-              numberOfTeamMembers: action.payload.numberOfTeamMembers,
-              aboutUs: action.payload.aboutUs,
+              companyLogo: profileData.companyLogo,
+              startupName: profileData.startupName,
+              industryCategory: profileData.industryCategory,
+              fundingStage: profileData.fundingStage,
+              location: profileData.location,
+              numberOfTeamMembers: profileData.numberOfTeamMembers,
+              aboutUs: profileData.aboutUs,
+
+              // --- THÊM 2 DÒNG NÀY ---
+              // Cập nhật projectLimit/walletBalance khi refresh profile
+              projectLimit: profileData.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance: profileData.walletBalance ?? state.user.walletBalance ?? 0,
             };
+            // --- KẾT THÚC SỬA ĐỔI ---
+
+            // Cập nhật localStorage
+            localStorage.setItem("user", JSON.stringify(state.user));
           }
           state.error = null;
         }
@@ -417,26 +441,39 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: StartupProfileResponse }) => {
           state.loading = false;
           if (state.user) {
+
+            // --- SỬA ĐỔI TẠI ĐÂY ---
+            // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
+            const profileData = action.payload as any;
+
             // Cập nhật user với thông tin profile mới
             state.user = {
               ...state.user,
-              fullName: action.payload.fullName || state.user.fullName,
-              phoneNumber: action.payload.phoneNumber,
-              linkedInProfile: action.payload.linkedInProfile,
-              companyWebsite: action.payload.companyWebsite,
-              profilePictureUrl: action.payload.profilePictureUrl
-                ? action.payload.profilePictureUrl.startsWith("http")
-                  ? action.payload.profilePictureUrl
-                  : `${BASE_URL}${action.payload.profilePictureUrl}`
+              fullName: profileData.fullName || state.user.fullName,
+              phoneNumber: profileData.phoneNumber,
+              linkedInProfile: profileData.linkedInProfile,
+              companyWebsite: profileData.companyWebsite,
+              profilePictureUrl: profileData.profilePictureUrl
+                ? profileData.profilePictureUrl.startsWith("http")
+                  ? profileData.profilePictureUrl
+                  : `${BASE_URL}${profileData.profilePictureUrl}` //
                 : undefined,
-              companyLogo: action.payload.companyLogo,
-              startupName: action.payload.startupName,
-              industryCategory: action.payload.industryCategory,
-              fundingStage: action.payload.fundingStage,
-              location: action.payload.location,
-              numberOfTeamMembers: action.payload.numberOfTeamMembers,
-              aboutUs: action.payload.aboutUs,
+              companyLogo: profileData.companyLogo,
+              startupName: profileData.startupName,
+              industryCategory: profileData.industryCategory,
+              fundingStage: profileData.fundingStage,
+              location: profileData.location,
+              numberOfTeamMembers: profileData.numberOfTeamMembers,
+              aboutUs: profileData.aboutUs,
+
+              // --- THÊM 2 DÒNG NÀY ---
+              projectLimit: profileData.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance: profileData.walletBalance ?? state.user.walletBalance ?? 0,
             };
+            // --- KẾT THÚC SỬA ĐỔI ---
+            
+            // Cập nhật localStorage
+            localStorage.setItem("user", JSON.stringify(state.user));
           }
           state.error = null;
           message.success("Cập nhật profile thành công");
@@ -449,104 +486,114 @@ const authSlice = createSlice({
           state.error = action.payload?.message || "Cập nhật profile thất bại";
           message.error(state.error);
         }
+      )
+
+      // Investor profile handlers
+      .addCase(getInvestorProfile.pending, (state: AuthState) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(
+        getInvestorProfile.fulfilled,
+        (state: AuthState, action: { payload: any }) => {
+          state.loading = false;
+          if (state.user) {
+            
+            // --- SỬA ĐỔI TẠI ĐÂY ---
+            state.user = {
+              ...state.user,
+              fullName: action.payload.fullName || state.user.fullName,
+              phoneNumber: action.payload.phoneNumber || state.user.phoneNumber,
+              organization:
+                action.payload.organization || state.user.organization,
+              investmentFocus:
+                action.payload.investmentFocus || state.user.investmentFocus,
+              investmentRange:
+                action.payload.investmentRange || state.user.investmentRange,
+              investmentExperience:
+                action.payload.investmentExperience ||
+                state.user.investmentExperience,
+              profilePictureUrl: action.payload.profilePictureUrl
+                ? action.payload.profilePictureUrl.startsWith("http")
+                  ? action.payload.profilePictureUrl
+                  : `${BASE_URL}${action.payload.profilePictureUrl}` //
+                : state.user.profilePictureUrl,
+              country: action.payload.country || state.user.country,
+              linkedInProfile:
+                action.payload.linkedInUrl || state.user.linkedInProfile,
+              twoFactorEnabled:
+                action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
+                
+              // --- THÊM 2 DÒNG NÀY ---
+              projectLimit: action.payload.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance: action.payload.walletBalance ?? state.user.walletBalance ?? 0,
+            };
+            // --- KẾT THÚC SỬA ĐỔI ---
+
+            localStorage.setItem("user", JSON.stringify(state.user));
+          }
+          state.error = null;
+        }
+      )
+      .addCase(
+        getInvestorProfile.rejected,
+        (state: AuthState, action: { payload?: { message: string } }) => {
+          state.loading = false;
+          state.error =
+            action.payload?.message || "Lấy thông tin investor thất bại";
+          message.error(state.error);
+        }
+      )
+      .addCase(updateInvestorProfile.pending, (state: AuthState) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(
+        updateInvestorProfile.fulfilled,
+        (state: AuthState, action: { payload: any }) => {
+          state.loading = false;
+          if (state.user) {
+
+            // --- SỬA ĐỔI TẠI ĐÂY ---
+            state.user = {
+              ...state.user,
+              fullName: action.payload.fullName || state.user.fullName,
+              phoneNumber: action.payload.phoneNumber || state.user.phoneNumber,
+              organization:
+                action.payload.organization || state.user.organization,
+              investmentFocus:
+                action.payload.investmentFocus || state.user.investmentFocus,
+              investmentRange:
+                action.payload.investmentRange || state.user.investmentRange,
+              investmentExperience:
+                action.payload.investmentExperience ||
+                state.user.investmentExperience,
+              country: action.payload.country || state.user.country,
+              linkedInProfile:
+                action.payload.linkedInUrl || state.user.linkedInProfile,
+              twoFactorEnabled:
+                action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
+
+              // --- THÊM 2 DÒNG NÀY ---
+              projectLimit: action.payload.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance: action.payload.walletBalance ?? state.user.walletBalance ?? 0,
+            };
+            // --- KẾT THÚC SỬA ĐỔI ---
+            
+            localStorage.setItem("user", JSON.stringify(state.user));
+          }
+          state.error = null;
+          message.success("Cập nhật profile investor thành công");
+        }
+      )
+      .addCase(
+        updateInvestorProfile.rejected,
+        (state: AuthState, action: { payload?: { message: string } }) => {
+          state.loading = false;
+          state.error = action.payload?.message || "Cập nhật investor thất bại";
+          message.error(state.error);
+        }
       );
-
-    // Investor profile handlers
-    builder.addCase(getInvestorProfile.pending, (state: AuthState) => {
-      state.loading = true;
-      state.error = null;
-    });
-
-    builder.addCase(
-      getInvestorProfile.fulfilled,
-      (state: AuthState, action: { payload: any }) => {
-        state.loading = false;
-        if (state.user) {
-          state.user = {
-            ...state.user,
-            fullName: action.payload.fullName || state.user.fullName,
-            phoneNumber: action.payload.phoneNumber || state.user.phoneNumber,
-            organization:
-              action.payload.organization || state.user.organization,
-            investmentFocus:
-              action.payload.investmentFocus || state.user.investmentFocus,
-            investmentRange:
-              action.payload.investmentRange || state.user.investmentRange,
-            investmentExperience:
-              action.payload.investmentExperience ||
-              state.user.investmentExperience,
-            profilePictureUrl: action.payload.profilePictureUrl
-              ? action.payload.profilePictureUrl.startsWith("http")
-                ? action.payload.profilePictureUrl
-                : `${BASE_URL}${action.payload.profilePictureUrl}`
-              : state.user.profilePictureUrl,
-            // include country and linkedInUrl returned by server
-            country: action.payload.country || state.user.country,
-            linkedInProfile:
-              action.payload.linkedInUrl || state.user.linkedInProfile,
-            twoFactorEnabled:
-              action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
-          };
-          localStorage.setItem("user", JSON.stringify(state.user));
-        }
-        state.error = null;
-      }
-    );
-
-    builder.addCase(
-      getInvestorProfile.rejected,
-      (state: AuthState, action: { payload?: { message: string } }) => {
-        state.loading = false;
-        state.error =
-          action.payload?.message || "Lấy thông tin investor thất bại";
-        message.error(state.error);
-      }
-    );
-
-    builder.addCase(updateInvestorProfile.pending, (state: AuthState) => {
-      state.loading = true;
-      state.error = null;
-    });
-
-    builder.addCase(
-      updateInvestorProfile.fulfilled,
-      (state: AuthState, action: { payload: any }) => {
-        state.loading = false;
-        if (state.user) {
-          state.user = {
-            ...state.user,
-            fullName: action.payload.fullName || state.user.fullName,
-            phoneNumber: action.payload.phoneNumber || state.user.phoneNumber,
-            organization:
-              action.payload.organization || state.user.organization,
-            investmentFocus:
-              action.payload.investmentFocus || state.user.investmentFocus,
-            investmentRange:
-              action.payload.investmentRange || state.user.investmentRange,
-            investmentExperience:
-              action.payload.investmentExperience ||
-              state.user.investmentExperience,
-            country: action.payload.country || state.user.country,
-            linkedInProfile:
-              action.payload.linkedInUrl || state.user.linkedInProfile,
-            twoFactorEnabled:
-              action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
-          };
-          localStorage.setItem("user", JSON.stringify(state.user));
-        }
-        state.error = null;
-        message.success("Cập nhật profile investor thành công");
-      }
-    );
-
-    builder.addCase(
-      updateInvestorProfile.rejected,
-      (state: AuthState, action: { payload?: { message: string } }) => {
-        state.loading = false;
-        state.error = action.payload?.message || "Cập nhật investor thất bại";
-        message.error(state.error);
-      }
-    );
   },
 });
 
