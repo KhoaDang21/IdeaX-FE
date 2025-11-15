@@ -105,3 +105,7 @@ export interface ApproveWithdraw {
 export interface RejectWithdraw {
   reason: string;
 }
+
+export interface PurchaseUpgradePackageRequestDTO {
+  packageId: number;
+}
