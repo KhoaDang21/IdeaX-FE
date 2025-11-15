@@ -135,11 +135,11 @@ const StartupsJoin: FC = () => {
   };
 
   const validatePassword = (password: string) => {
-    // Password must be at least 8 characters, contain at least one letter and one number
-    if (password.length < 6) return false;
-    const hasLetter = /[a-zA-Z]/.test(password);
+    // Yêu cầu BE hiện tại (môi trường Azure): >= 8 ký tự, có ít nhất 1 chữ HOA và 1 số
+    if (password.length < 8) return false;
+    const hasUpper = /[A-Z]/.test(password);
     const hasNumber = /\d/.test(password);
-    return hasLetter && hasNumber;
+    return hasUpper && hasNumber;
   };
 
   const validateFile = (file: File | null) => {
@@ -193,7 +193,7 @@ const StartupsJoin: FC = () => {
     if (!password) newErrors.password = "Vui lòng nhập mật khẩu";
     else if (!validatePassword(password)) {
       newErrors.password =
-        "Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ cái và số";
+        "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ HOA và 1 số";
     }
 
     // Validate confirm password

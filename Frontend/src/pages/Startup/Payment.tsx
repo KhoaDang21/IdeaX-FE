@@ -47,6 +47,21 @@ const Payment: React.FC = () => {
     (state: RootState) => state.payment
   );
 
+  const totals = React.useMemo(() => {
+    let totalDeposits = 0;
+    let totalInvested = 0;
+    if (!transactions || transactions.length === 0) return { totalDeposits, totalInvested };
+    for (const t of transactions) {
+      const amt = Number(t.amount ?? 0);
+      if (t.type === "DEPOSIT" && t.status === "SUCCESS") totalDeposits += amt;
+      if (t.type === "PROJECT_PAYMENT") {
+        if (t.status === "REFUNDED") continue;
+        totalInvested += Math.abs(amt);
+      }
+    }
+    return { totalDeposits, totalInvested };
+  }, [transactions]);
+
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   // Bỏ 'loading' state, dùng 'status' từ slice
@@ -80,19 +95,19 @@ const Payment: React.FC = () => {
     try {
       const values = await depositForm.validateFields();
       const amount = Number(values.amount);
-      const method = values.paymentMethod; // Sẽ là "VNPAY" hoặc "PAYOS"
+      const method = "PAYOS";
 
-      // Gọi một thunk 'createDeposit' duy nhất
+      // Gọi một thunk 'createDeposit' duy nhất với mặc định PayOS
       const res = await dispatch(
         createDeposit({ amount, paymentMethod: method })
       ).unwrap();
 
       message.success("Tạo yêu cầu nạp tiền thành công!");
 
-      // Backend của bạn trả về paymentUrl trong cả 2 trường hợp
-      const url = res.paymentUrl;
+      // Backend trả về redirectUrl hoặc paymentUrl
+      const url = res.redirectUrl || res.paymentUrl;
       if (url) {
-        window.open(url, "_blank"); // Mở link thanh toán
+        window.location.href = url; // Điều hướng trực tiếp tới PayOS
       }
 
       setDepositModalOpen(false);
@@ -297,7 +312,7 @@ const Payment: React.FC = () => {
               margin: "0 0 4px",
             }}
           >
-            {formatCurrency(wallet?.totalDeposits ?? 0)}
+            {formatCurrency(totals.totalDeposits ?? 0)}
           </h2>
         </div>
         <div
@@ -321,7 +336,7 @@ const Payment: React.FC = () => {
               margin: "0 0 4px",
             }}
           >
-            {formatCurrency(wallet?.totalInvested ?? 0)}
+            {formatCurrency(totals.totalInvested ?? 0)}
           </h2>
         </div>
       </div>
@@ -446,21 +461,6 @@ const Payment: React.FC = () => {
               }
               // --- SỬA PARSER ---
               parser={(value) => value?.replace(/\$\s?|(,*)/g, "") as any}
-            />
-          </Form.Item>
-          <Form.Item
-            label="Payment Method"
-            name="paymentMethod"
-            initialValue="PAYOS" // Đặt PayOS làm mặc định
-          >
-            <Select
-              options={[
-                // --- SỬA DANH SÁCH ---
-                { label: "PayOS (Recommended)", value: "PAYOS" },
-                { label: "VNPay", value: "VNPAY" },
-                // { label: "MoMo", value: "MOMO" },
-                // { label: "ZaloPay", value: "ZALOPAY" },
-              ]}
             />
           </Form.Item>
         </Form>

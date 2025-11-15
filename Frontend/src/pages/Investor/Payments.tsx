@@ -29,14 +29,11 @@ import dayjs from "dayjs";
 import type { RootState, AppDispatch } from "../../store";
 import {
     createDeposit,
-    createDepositZaloPay,
-    createDepositMoMo,
     createPayment,
     createWithdraw,
     getMyWallet,
     getTransactionHistory,
     refundPayment,
-    releasePayment,
 } from "../../services/features/payment/paymentSlice";
 import { getAllProjects } from "../../services/features/project/projectSlice";
 import type {
@@ -118,7 +115,6 @@ const Payments: React.FC = () => {
     const [depositing, setDepositing] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
     const [investing, setInvesting] = useState(false);
-    const [releasingId, setReleasingId] = useState<number | null>(null);
     const [selectedRefundPayment, setSelectedRefundPayment] = useState<number | null>(null);
     const [refunding, setRefunding] = useState(false);
 
@@ -200,19 +196,12 @@ const Payments: React.FC = () => {
             const values = await depositForm.validateFields();
             setDepositing(true);
             const amount = Number(values.amount);
-            const method = values.paymentMethod as string;
-            let res;
-            if (method === "MOMO") {
-                res = await dispatch(createDepositMoMo({ amount, paymentMethod: method })).unwrap();
-            } else if (method === "ZALOPAY") {
-                res = await dispatch(createDepositZaloPay({ amount, paymentMethod: method })).unwrap();
-            } else {
-                res = await dispatch(createDeposit({ amount, paymentMethod: "VNPAY" })).unwrap();
-            }
-            message.success(`Deposit request created. Redirecting to ${res.gateway ?? method ?? "payment gateway"}`);
+            const method = "PAYOS";
+            const res = await dispatch(createDeposit({ amount, paymentMethod: method })).unwrap();
+            message.success(`Deposit request created. Redirecting to PayOS`);
             const url = res.redirectUrl || res.paymentUrl;
             if (url) {
-                window.open(url, "_blank", "noopener");
+                window.location.href = url;
             } else {
                 message.error("Không tìm thấy URL thanh toán từ cổng thanh toán.");
             }
@@ -289,27 +278,6 @@ const Payments: React.FC = () => {
         }
     };
 
-    const handleRelease = async (paymentId: number) => {
-        setReleasingId(paymentId);
-        try {
-            await dispatch(releasePayment(paymentId)).unwrap();
-            message.success("Release successful");
-            await Promise.all([
-                fetchWallet(),
-                fetchTransactions(transactionPage, transactionPageSize),
-            ]);
-        } catch (err: any) {
-            message.error(extractErrorMessage(err, "Release failed"));
-        } finally {
-            setReleasingId(null);
-        }
-    };
-
-    const openRefundModal = (paymentId: number) => {
-        setSelectedRefundPayment(paymentId);
-        setRefundModalOpen(true);
-    };
-
     const closeRefundModal = () => {
         setRefundModalOpen(false);
         setSelectedRefundPayment(null);
@@ -342,6 +310,51 @@ const Payments: React.FC = () => {
 
     const walletData: WalletResponse | null = wallet ?? null;
 
+    const totals = useMemo(() => {
+        // Compute totals based on TransactionType and TransactionStatus from backend
+        let totalDeposits = 0;
+        let totalInvested = 0;
+        let pendingWithdrawals = 0;
+        if (!transactions || transactions.length === 0) return { totalDeposits, totalInvested, pendingWithdrawals };
+
+        for (const t of transactions) {
+            const amt = Number(t.amount ?? 0);
+            const abs = Math.abs(amt);
+            // Deposits that succeeded
+            if (t.type === "DEPOSIT" && t.status === "SUCCESS") {
+                totalDeposits += abs;
+            }
+
+            // Project payments represent investor investments (amount stored negative when charged)
+            if (t.type === "PROJECT_PAYMENT" && t.status === "SUCCESS") {
+                totalInvested += abs;
+            }
+
+            // Refunds reduce invested amount (represented by PAYMENT_REFUND transactions)
+            if (t.type === "PAYMENT_REFUND" && t.status === "SUCCESS") {
+                totalInvested -= abs;
+            }
+
+            // Pending withdrawals (amount stored negative)
+            if (t.type === "WITHDRAW" && t.status === "PENDING") {
+                pendingWithdrawals += abs;
+            }
+        }
+
+        // Ensure totals non-negative
+        if (totalInvested < 0) totalInvested = 0;
+
+        return { totalDeposits, totalInvested, pendingWithdrawals };
+    }, [transactions]);
+
+    const availableForWithdrawal = useMemo(() => {
+        // Backend currently returns only `balance`. Use that as the source of truth.
+        // If there are pending withdrawal requests that already deducted balance on server,
+        // they are already reflected in `balance`. We still expose the number as a hint.
+        const bal = Number(walletData?.balance ?? 0);
+        return bal;
+    }, [walletData]);
+
     const columns: ColumnsType<TransactionResponse> = [
         {
             title: "Thời gian",
@@ -356,10 +369,11 @@ const Payments: React.FC = () => {
             render: (value: string) => {
                 const typeColors: Record<string, string> = {
                     DEPOSIT: "blue",
-                    WITHDRAWAL: "orange",
-                    DISBURSEMENT: "purple",
-                    REFUND: "volcano",
+                    WITHDRAW: "orange",
                     PROJECT_PAYMENT: "green",
+                    PAYMENT_RELEASE: "cyan",
+                    PAYMENT_REFUND: "volcano",
+                    PROJECT_UPGRADE: "purple",
                 };
                 return <Tag color={typeColors[value] || "default"}>{value}</Tag>;
             },
@@ -378,39 +392,7 @@ const Payments: React.FC = () => {
                 <Tag color={statusColor[value] ?? "default"}>{value}</Tag>
             ),
         },
-        {
-            title: "Action",
-            key: "actions",
-            width: 220,
-            render: (_, record) => {
-                const isProjectPayment =
-                    record.type === "PROJECT_PAYMENT" && !!record.paymentId;
-                const isPending = record.status === "PENDING";
-
-                // Always show buttons but disable when action is not allowed
-                return (
-                    <Space>
-                        <Button
-                            type="primary"
-                            size="small"
-                            loading={releasingId === record.paymentId}
-                            disabled={!(isProjectPayment && isPending)}
-                            onClick={() => record.paymentId && handleRelease(record.paymentId)}
-                        >
-                            Release
-                        </Button>
-                        <Button
-                            danger
-                            size="small"
-                            disabled={!(isProjectPayment && isPending)}
-                            onClick={() => record.paymentId && openRefundModal(record.paymentId)}
-                        >
-                            Refund
-                        </Button>
-                    </Space>
-                );
-            },
-        },
+        // Action column removed — actions handled elsewhere or by admin
     ];
 
     const renderWalletSummary = () => (
@@ -501,7 +483,7 @@ const Payments: React.FC = () => {
                                     background: "linear-gradient(135deg, #722ED1 0%, #1677ff 100%)",
                                     WebkitBackgroundClip: "text",
                                     WebkitTextFillColor: "transparent"
-                                }}>{formatCurrency(walletData?.totalDeposits ?? 0)}</div>
+                                }}>{formatCurrency(totals.totalDeposits ?? 0)}</div>
                             </div>
                         </Card>
                     </Col>
@@ -524,7 +506,7 @@ const Payments: React.FC = () => {
                                     background: "linear-gradient(135deg, #722ED1 0%, #1677ff 100%)",
                                     WebkitBackgroundClip: "text",
                                     WebkitTextFillColor: "transparent"
-                                }}>{formatCurrency(walletData?.totalInvested ?? 0)}</div>
+                                }}>{formatCurrency(totals.totalInvested ?? 0)}</div>
                             </div>
                         </Card>
                     </Col>
@@ -547,7 +529,7 @@ const Payments: React.FC = () => {
                                     background: "linear-gradient(135deg, #722ED1 0%, #1677ff 100%)",
                                     WebkitBackgroundClip: "text",
                                     WebkitTextFillColor: "transparent"
-                                }}>{formatCurrency(walletData?.availableForWithdrawal ?? walletData?.balance ?? 0)}</div>
+                                }}>{formatCurrency(availableForWithdrawal ?? walletData?.balance ?? 0)}</div>
                             </div>
                         </Card>
                     </Col>
@@ -673,10 +655,10 @@ const Payments: React.FC = () => {
             t => t.type === 'DEPOSIT' && t.status === 'PENDING'
         );
         const pendingWithdrawals = transactions.filter(
-            t => t.type === 'WITHDRAWAL' && t.status === 'PENDING'
+            t => t.type === 'WITHDRAW' && t.status === 'PENDING'
         );
         const pendingRefunds = transactions.filter(
-            t => t.type === 'REFUND' && t.status === 'PENDING'
+            t => t.type === 'PAYMENT_REFUND' && t.status === 'PENDING'
         );
 
         return {
@@ -869,24 +851,8 @@ const Payments: React.FC = () => {
                             parser={parseNumberInput}
                         />
                     </Form.Item>
-                    <Form.Item
-                        label="Payment Method"
-                        name="paymentMethod"
-                        rules={[{ required: true, message: "Please select a payment method" }]}
-                    >
-                        <Select
-                            placeholder="Select gateway"
-                            options={[
-                                { label: "VNPay", value: "VNPAY" },
-                                { label: "MoMo", value: "MOMO" },
-                                { label: "ZaloPay", value: "ZALOPAY" },
-                            ]}
-                        />
-                    </Form.Item>
                 </Form>
-                <Text type="secondary">
-                    You will be redirected to the selected payment gateway.
-                </Text>
+                <Text type="secondary">You will be redirected to PayOS.</Text>
             </Modal>
 
             <Modal

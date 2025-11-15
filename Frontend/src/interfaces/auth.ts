@@ -54,6 +54,7 @@ export interface InvestorRegisterCredentials {
   fullName: string;
   organization?: string;
   investmentFocus?: string;
+  customInvestmentFocus?: string;
   investmentRange?: string;
   investmentExperience?: string;
 }

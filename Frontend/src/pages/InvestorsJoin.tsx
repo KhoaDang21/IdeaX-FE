@@ -11,6 +11,11 @@ import { useState } from "react";
 import logo from "../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg";
 import { useDispatch } from "react-redux";
 import { registerInvestor } from "../services/features/auth/authSlice";
+import {
+  CATEGORY_OPTIONS,
+  FUNDING_RANGE_OPTIONS,
+  INVESTMENT_EXPERIENCE_OPTIONS,
+} from "../services/constant/enumMapping";
 
 type InputProps = {
   label: string;
@@ -90,7 +95,7 @@ const Input: FC<InputProps> = ({
 type SelectProps = {
   label: string;
   placeholder?: string;
-  options: string[];
+  options: Array<{ label: string; value: string }>;
   value?: string;
   onChange?: (e: ChangeEvent<HTMLSelectElement>) => void;
 };
@@ -130,8 +135,8 @@ const Select: FC<SelectProps> = ({
         {placeholder}
       </option>
       {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
         </option>
       ))}
     </select>
@@ -156,6 +161,7 @@ const InvestorsJoin: FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [organization, setOrganization] = useState("");
+  const [customInvestmentFocus, setCustomInvestmentFocus] = useState("");
   const [investmentFocus, setInvestmentFocus] = useState("");
   const [investmentRange, setInvestmentRange] = useState("");
   const [investmentExperience, setInvestmentExperience] = useState("");
@@ -173,25 +179,25 @@ const InvestorsJoin: FC = () => {
   };
 
   const validatePassword = (password: string) => {
-    // Password must be at least 8 characters, contain at least one letter and one number
-    if (password.length < 6) return false;
-    const hasLetter = /[a-zA-Z]/.test(password);
+    // Đồng bộ với BE hiện tại (môi trường Azure): tối thiểu 8 ký tự, có ít nhất 1 chữ HOA và 1 số
+    if (password.length < 8) return false;
+    const hasUpper = /[A-Z]/.test(password);
     const hasNumber = /\d/.test(password);
-    return hasLetter && hasNumber;
+    return hasUpper && hasNumber;
   };
 
   // Clear a specific field error when user types
   const onChangeField =
     (setter: (v: string) => void, field?: string) =>
-    (e: ChangeEvent<HTMLInputElement>) => {
-      if (field)
-        setErrors((prev) => {
-          const copy = { ...prev };
-          delete (copy as any)[field];
-          return copy;
-        });
-      setter(e.target.value);
-    };
+      (e: ChangeEvent<HTMLInputElement>) => {
+        if (field)
+          setErrors((prev) => {
+            const copy = { ...prev };
+            delete (copy as any)[field];
+            return copy;
+          });
+        setter(e.target.value);
+      };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,12 +214,19 @@ const InvestorsJoin: FC = () => {
     if (!password) newErrors.password = "Vui lòng nhập mật khẩu";
     else if (!validatePassword(password)) {
       newErrors.password =
-        "Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ cái và số";
+        "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ HOA và 1 số";
     }
     if (!confirmPassword)
       newErrors.confirmPassword = "Vui lòng nhập xác nhận mật khẩu";
     else if (password !== confirmPassword)
       newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
+    if (
+      investmentFocus &&
+      investmentFocus === "OTHER" &&
+      !customInvestmentFocus.trim()
+    ) {
+      newErrors.customInvestmentFocus = "Vui lòng nhập ngành đầu tư cụ thể";
+    }
     // Validate các field optional nhưng vẫn báo nếu trống (nếu muốn bắt buộc)
     // if (!organization.trim()) newErrors.organization = 'Vui lòng nhập tổ chức';
     // if (!investmentFocus.trim()) newErrors.investmentFocus = 'Vui lòng chọn lĩnh vực đầu tư';
@@ -232,18 +245,25 @@ const InvestorsJoin: FC = () => {
       duration: 0,
     });
     try {
-      await (dispatch as any)(
-        registerInvestor({
-          email: trimmed.email,
-          password,
-          confirmPassword,
-          fullName: trimmed.fullName,
-          organization,
-          investmentFocus,
-          investmentRange,
-          investmentExperience,
-        })
-      ).unwrap();
+      const payload = {
+        email: trimmed.email,
+        password,
+        confirmPassword,
+        fullName: trimmed.fullName,
+        organization: organization?.trim() || undefined,
+        investmentFocus: investmentFocus || undefined,
+        customInvestmentFocus:
+          investmentFocus &&
+            investmentFocus === "OTHER" &&
+            customInvestmentFocus.trim()
+            ? customInvestmentFocus.trim()
+            : undefined,
+        investmentRange: investmentRange ? investmentRange.trim() : undefined,
+        investmentExperience: investmentExperience
+          ? investmentExperience.trim()
+          : undefined,
+      };
+      await (dispatch as any)(registerInvestor(payload)).unwrap();
       message.success({
         content: "Tạo tài khoản thành công! Vui lòng đăng nhập.",
         key: "register",
@@ -514,43 +534,30 @@ const InvestorsJoin: FC = () => {
                 <Select
                   label="Investment Focus"
                   placeholder="Select investment focus"
-                  options={[
-                    "Technology & Software",
-                    "Healthcare & Biotech",
-                    "Fintech & Financial Services",
-                    "E-commerce & Retail",
-                    "Education & EdTech",
-                    "Real Estate & PropTech",
-                    "Energy & CleanTech",
-                    "Manufacturing & Industrial",
-                    "Media & Entertainment",
-                    "Transportation & Logistics",
-                    "Agriculture & FoodTech",
-                    "Other",
-                  ]}
+                  options={CATEGORY_OPTIONS}
                   value={investmentFocus}
                   onChange={(e) => setInvestmentFocus(e.target.value)}
                 />
+                {investmentFocus && investmentFocus === "OTHER" && (
+                  <Input
+                    label="Specific Industry (if Other)"
+                    placeholder="Enter the specific industry"
+                    value={customInvestmentFocus}
+                    onChange={(e) => setCustomInvestmentFocus(e.target.value)}
+                    error={errors.customInvestmentFocus}
+                  />
+                )}
                 <Select
                   label="Investment Range"
                   placeholder="Select investment range"
-                  options={[
-                    "$10K - $50K",
-                    "$50K - $100K",
-                    "$100K - $250K",
-                    "$250K - $500K",
-                    "$500K - $1M",
-                    "$1M - $2.5M",
-                    "$2.5M - $5M",
-                    "$5M - $10M",
-                    "$10M+",
-                  ]}
+                  options={FUNDING_RANGE_OPTIONS}
                   value={investmentRange}
                   onChange={(e) => setInvestmentRange(e.target.value)}
                 />
-                <Input
+                <Select
                   label="Investment Experience"
-                  placeholder="Enter your investment experience"
+                  placeholder="Select investment experience"
+                  options={INVESTMENT_EXPERIENCE_OPTIONS}
                   value={investmentExperience}
                   onChange={(e) => setInvestmentExperience(e.target.value)}
                 />
