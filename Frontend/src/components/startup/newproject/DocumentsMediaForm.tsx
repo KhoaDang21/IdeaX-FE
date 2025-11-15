@@ -6,7 +6,8 @@ import {
   BarChartOutlined,
 } from "@ant-design/icons";
 import type { ProjectFormState } from "../../../interfaces/project";
-import type { ValidationErrors } from "../../../pages/Startup/NewProject"; // Assuming ValidationErrors is exported from parent
+// Define local ValidationErrors type to avoid coupling to page implementation
+type ValidationErrors = Record<string, string | undefined>;
 import { FileUploadField } from "./FileUploadField";
 
 interface Props {
