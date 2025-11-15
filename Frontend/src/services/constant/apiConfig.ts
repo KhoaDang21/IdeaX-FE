@@ -1,5 +1,5 @@
 export const BASE_URL =
-  "https://ideax-backend.whitedesert-2f8f0fc8.southeastasia.azurecontainerapps.io";
+  "http://localhost:8081";
 // export const BASE_URL = "https://ideax-backend.onrender.com";
 
 // Auth endpoints

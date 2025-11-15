@@ -18,6 +18,8 @@ import type {
   WithdrawRequestDetail,
   ApproveWithdraw,
   RejectWithdraw,
+  // --- THÊM INTERFACE MỚI TỪ /interfaces/payment ---
+  PurchaseUpgradePackageRequestDTO, 
 } from "../../../interfaces/payment";
 
 interface PaymentState {
@@ -126,6 +128,7 @@ export const getMyWallet = createAsyncThunk<
   }
 });
 
+// Thunk này dùng chung cho cả VNPAY và PAYOS (dựa trên payload.paymentMethod)
 export const createDeposit = createAsyncThunk<
   DepositResponse,
   DepositRequest,
@@ -144,6 +147,7 @@ export const createDeposit = createAsyncThunk<
   }
 });
 
+// Thunk này có thể không còn đúng với API mới của bạn (xem lại)
 export const createDepositZaloPay = createAsyncThunk<
   DepositResponse,
   DepositRequest,
@@ -162,6 +166,7 @@ export const createDepositZaloPay = createAsyncThunk<
   }
 });
 
+// Thunk này có thể không còn đúng với API mới của bạn (xem lại)
 export const createDepositMoMo = createAsyncThunk<
   DepositResponse,
   DepositRequest,
@@ -206,7 +211,6 @@ export const createPayment = createAsyncThunk<
   try {
     const res = await api.post<PaymentResponse>(`${BASE}/create`, {
       ...payload,
-      // backend expects amount as BigDecimal; make sure it's numeric
       amount: Number(payload.amount),
     });
     return res.data;
@@ -293,6 +297,41 @@ export const getTransactionHistoryByUser = createAsyncThunk<
   }
 );
 
+// --- THUNK MỚI 1: MUA GÓI BẰNG VÍ ---
+export const purchaseWithWallet = createAsyncThunk<
+  void, // BE trả về 200 OK (void)
+  PurchaseUpgradePackageRequestDTO,
+  { rejectValue: string }
+>("payment/purchaseWithWallet", async (payload, { rejectWithValue }) => {
+  try {
+    await api.post(`${BASE}/purchase-with-wallet`, payload); //
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to purchase with wallet"
+    );
+  }
+});
+
+// --- THUNK MỚI 2: TẠO LINK PAYOS/VNPAY ĐỂ MUA GÓI ---
+export const createPackageOrder = createAsyncThunk<
+  DepositResponse, // BE trả về cùng DTO với nạp tiền (chứa paymentUrl)
+  PurchaseUpgradePackageRequestDTO,
+  { rejectValue: string }
+>("payment/createPackageOrder", async (payload, { rejectWithValue }) => {
+  try {
+    const res = await api.post<DepositResponse>(
+      `${BASE}/create-package-order`, //
+      payload
+    );
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to create package order"
+    );
+  }
+});
+
+
 const paymentSlice = createSlice({
   name: "payment",
   initialState,
@@ -346,12 +385,23 @@ const paymentSlice = createSlice({
         state.status = "succeeded";
       })
       .addCase(approveWithdraw.fulfilled, (state) => {
-        // approval returns message; we can set status but keep data refreshed by caller
         state.status = "succeeded";
       })
       .addCase(rejectWithdrawAdmin.fulfilled, (state) => {
         state.status = "succeeded";
       })
+
+      // --- THÊM REDUCER CHO THUNK MỚI ---
+      .addCase(purchaseWithWallet.fulfilled, (state) => {
+        state.status = "succeeded";
+        // Không cần làm gì thêm, component sẽ gọi getStartupProfile
+      })
+      .addCase(createPackageOrder.fulfilled, (state, action) => {
+        state.depositResult = action.payload; // Lưu link thanh toán
+        state.status = "succeeded";
+      })
+      // --- KẾT THÚC THÊM ---
+
       .addMatcher(isPending, (state) => {
         state.status = "loading";
         state.error = null;
