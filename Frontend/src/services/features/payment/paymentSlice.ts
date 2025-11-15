@@ -19,7 +19,7 @@ import type {
   ApproveWithdraw,
   RejectWithdraw,
   // --- THÊM INTERFACE MỚI TỪ /interfaces/payment ---
-  PurchaseUpgradePackageRequestDTO, 
+  PurchaseUpgradePackageRequestDTO,
 } from "../../../interfaces/payment";
 
 interface PaymentState {
@@ -154,7 +154,8 @@ export const createDepositZaloPay = createAsyncThunk<
   { rejectValue: string }
 >("payment/createDepositZaloPay", async (payload, { rejectWithValue }) => {
   try {
-    const res = await api.post<DepositResponse>(`${BASE}/wallet/deposit/zalopay`, {
+    // Backend supports a single deposit endpoint that accepts paymentMethod
+    const res = await api.post<DepositResponse>(`${BASE}/wallet/deposit`, {
       ...payload,
       amount: Number(payload.amount),
     });
@@ -173,7 +174,8 @@ export const createDepositMoMo = createAsyncThunk<
   { rejectValue: string }
 >("payment/createDepositMoMo", async (payload, { rejectWithValue }) => {
   try {
-    const res = await api.post<DepositResponse>(`${BASE}/wallet/deposit/momo`, {
+    // Backend supports a single deposit endpoint that accepts paymentMethod
+    const res = await api.post<DepositResponse>(`${BASE}/wallet/deposit`, {
       ...payload,
       amount: Number(payload.amount),
     });
@@ -330,7 +332,6 @@ export const createPackageOrder = createAsyncThunk<
     );
   }
 });
-
 
 const paymentSlice = createSlice({
   name: "payment",
