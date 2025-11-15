@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { message, Form, Button } from "antd";
-import type { RootState, AppDispatch } from "../../store"; // <-- THÊM AppDispatch
+import { message, Form, Button } from "antd"; // Đã thêm Modal, Button
+import type { RootState, AppDispatch } from "../../store";
 import {
   getMyProjects,
   getMilestonesByProject,
   deleteProject,
   createMilestone,
-  deleteMilestone, // <-- IMPORT deleteMilestone
+  deleteMilestone,
 } from "../../services/features/project/projectSlice";
 import type { Project as ApiProject } from "../../interfaces/project";
 import type { Milestone as ApiMilestone } from "../../interfaces/milestone";
@@ -16,7 +16,7 @@ import { logActivity } from "../../utils/activityLogger";
 import type {
   ProjectUI,
   MilestoneUI,
-} from "../../interfaces/startup/myprojects"; // <-- Import interface mới
+} from "../../interfaces/startup/myprojects";
 
 // Import các component con
 import { ProjectPageHeader } from "../../components/startup/myprojects/ProjectPageHeader";
@@ -26,6 +26,8 @@ import { MilestoneList } from "../../components/startup/myprojects/MilestoneList
 import { ProjectMetrics } from "../../components/startup/myprojects/ProjectMetrics";
 import { QuickActions } from "../../components/startup/myprojects/QuickActions";
 import { AddMilestoneModal } from "../../components/startup/myprojects/AddMilestoneModal";
+// --- THÊM IMPORT MODAL NÂNG CẤP ---
+import { UpgradeModal } from "../../components/startup/myprojects/UpgradeModal";
 
 // --- Các hàm helper (formatCurrency, getFundingRangeDisplay, etc.) giữ nguyên ---
 const formatCurrency = (amount: number): string => {
@@ -108,11 +110,14 @@ const calculateCompletionFromTimeline = (
 
 const MyProjects: React.FC = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch<AppDispatch>(); // <-- Sử dụng AppDispatch
+  const dispatch = useDispatch<AppDispatch>();
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [deletingProjectIds, setDeletingProjectIds] = useState<number[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
+
+  // --- THÊM STATE CHO MODAL NÂNG CẤP ---
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const {
     projects: apiProjects,
@@ -121,9 +126,11 @@ const MyProjects: React.FC = () => {
     error,
   } = useSelector((state: RootState) => state.project);
 
+  // --- LẤY USER TỪ REDUX ---
+  const { user } = useSelector((state: RootState) => state.auth);
+
   // Tính toán danh sách projects UI
   const projects = useMemo((): ProjectUI[] => {
-    // ... (logic tính toán projects giữ nguyên) ...
     if (!apiProjects || apiProjects.length === 0) return [];
     return apiProjects.map((project) => {
       const timeline = generateTimeline(project);
@@ -182,10 +189,9 @@ const MyProjects: React.FC = () => {
     const project = projects.find((p) => p.id === selectedProject);
     if (!project) return null;
 
-    // <-- CẬP NHẬT: Thêm ID vào MilestoneUI khi map -->
     const projectMilestones: MilestoneUI[] = (apiMilestones || []).map(
       (milestone: ApiMilestone) => ({
-        id: milestone.id, // <-- THÊM ID
+        id: milestone.id,
         label: milestone.title || "Milestone",
         due: milestone.dueDate
           ? new Date(milestone.dueDate).toISOString().split("T")[0]
@@ -228,8 +234,20 @@ const MyProjects: React.FC = () => {
   }, [selectedProject, dispatch]);
 
   // --- HÀM HANDLERS ---
+
+  // --- SỬA HÀM handleNewProject ---
   const handleNewProject = () => {
-    navigate("/startup/new-project");
+    const currentProjectCount = apiProjects?.length || 0;
+    // Lấy limit từ user, mặc định là 2 nếu user chưa load kịp
+    const projectLimit = user?.projectLimit || 2;
+
+    if (currentProjectCount >= projectLimit) {
+      // ĐÃ ĐẠT GIỚI HẠN -> MỞ MODAL NÂNG CẤP
+      setIsUpgradeModalOpen(true);
+    } else {
+      // CHƯA ĐẠT -> CHO TẠO MỚI
+      navigate("/startup/new-project");
+    }
   };
 
   const handleDeleteProject = async (projectId: number) => {
@@ -239,20 +257,13 @@ const MyProjects: React.FC = () => {
     if (allowedStatuses.includes(projectToDelete.status.toUpperCase())) {
       setDeletingProjectIds((prev) => [...prev, projectId]);
       try {
-        await dispatch(deleteProject(projectId)).unwrap(); // <-- Use unwrap
-
-        // <-- THÊM LOG ACTIVITY KHI XÓA PROJECT -->
+        await dispatch(deleteProject(projectId)).unwrap();
         logActivity({
           action: `Deleted project: ${projectToDelete.title}`,
-          // projectId: String(projectId), // Có thể thêm nếu muốn
           timestamp: Date.now(),
         });
-        // <-- KẾT THÚC THÊM LOG -->
-
         message.success("Project deleted successfully");
-        // Re-fetch projects to update the list immediately
         dispatch(getMyProjects());
-        // Reset selected project if the deleted one was selected
         if (selectedProject === projectId) {
           const remainingProjects = projects.filter((p) => p.id !== projectId);
           setSelectedProject(
@@ -260,7 +271,7 @@ const MyProjects: React.FC = () => {
           );
         }
       } catch (err: any) {
-        message.error(err || "Failed to delete project"); // err might be the rejectValue
+        message.error(err || "Failed to delete project");
       } finally {
         setDeletingProjectIds((prev) => prev.filter((id) => id !== projectId));
       }
@@ -271,9 +282,8 @@ const MyProjects: React.FC = () => {
     }
   };
 
-  // <-- THÊM HÀM XÓA MILESTONE -->
   const handleDeleteMilestone = async (milestoneId: number) => {
-    if (!selectedProject) return; // Cần project ID để log
+    if (!selectedProject) return;
 
     const milestoneToDelete = apiMilestones?.find((m) => m.id === milestoneId);
     const currentProject = projects.find((p) => p.id === selectedProject);
@@ -283,9 +293,7 @@ const MyProjects: React.FC = () => {
       key: "deleteMilestone",
     });
     try {
-      await dispatch(deleteMilestone(milestoneId)).unwrap(); // <-- Gọi action xóa
-
-      // Log activity
+      await dispatch(deleteMilestone(milestoneId)).unwrap();
       logActivity({
         action: `Deleted milestone: ${
           milestoneToDelete?.title || "Milestone"
@@ -293,9 +301,7 @@ const MyProjects: React.FC = () => {
         projectId: String(selectedProject),
         timestamp: Date.now(),
       });
-
       message.success({ content: "Milestone deleted", key: "deleteMilestone" });
-      // Refetch milestones for the current project to update the list
       dispatch(getMilestonesByProject(selectedProject));
     } catch (err: any) {
       message.error({
@@ -304,41 +310,33 @@ const MyProjects: React.FC = () => {
       });
     }
   };
-  // <-- KẾT THÚC HÀM XÓA MILESTONE -->
 
   const handleCreateMilestone = async () => {
-    // Đổi tên handleOk thành handleCreateMilestone
     if (!selectedProject) return;
     try {
       const values = await form.validateFields();
-      // <-- FIX: THÊM projectId VÀO data object -->
       const data = {
-        projectId: selectedProject, // Thêm dòng này
+        projectId: selectedProject,
         title: values.title,
         description: values.description,
         dueDate: values.dueDate.format("YYYY-MM-DD"),
-        status: "PENDING", // Mặc định là PENDING khi tạo mới
+        status: "PENDING",
       };
-      // <-- KẾT THÚC FIX -->
       const result = await dispatch(
-        // Lấy kết quả trả về
-        createMilestone({ projectId: selectedProject, data }) // projectId ở đây vẫn cần thiết cho URL API
-      ).unwrap(); // Sử dụng unwrap để bắt lỗi
-
+        createMilestone({ projectId: selectedProject, data })
+      ).unwrap();
       logActivity({
-        action: `Created new milestone: ${result.title || "Milestone"}`, // Log tên milestone
+        action: `Created new milestone: ${result.title || "Milestone"}`,
         projectId: String(selectedProject),
         timestamp: Date.now(),
       });
-
-      dispatch(getMilestonesByProject(selectedProject)); // Fetch lại milestones
+      dispatch(getMilestonesByProject(selectedProject));
       message.success("Milestone created successfully");
       setIsModalOpen(false);
       form.resetFields();
     } catch (error: any) {
-      // Hiển thị lỗi cụ thể hơn nếu có từ unwrap
       message.error(error || "Failed to create milestone");
-      console.error("Failed to create milestone:", error); // Log lỗi ra console
+      console.error("Failed to create milestone:", error);
     }
   };
 
@@ -348,7 +346,6 @@ const MyProjects: React.FC = () => {
 
   // --- RENDER ---
 
-  // Các trạng thái loading, failed, empty giữ nguyên
   if (status === "loading" && projects.length === 0) {
     return (
       <div
@@ -382,7 +379,7 @@ const MyProjects: React.FC = () => {
           <Button
             type="primary"
             size="large"
-            onClick={handleNewProject}
+            onClick={handleNewProject} // Đã được canh gác
             style={{ background: "#38bdf8" }}
           >
             Create New Project
@@ -420,11 +417,10 @@ const MyProjects: React.FC = () => {
               title={selectedProjectData.title}
               timeline={selectedProjectData.timeline}
             />
-            {/* <-- TRUYỀN HÀM XÓA XUỐNG --> */}
             <MilestoneList
               milestones={selectedProjectData.milestones}
               onAddMilestone={() => setIsModalOpen(true)}
-              onDeleteMilestone={handleDeleteMilestone} // <-- TRUYỀN PROP MỚI
+              onDeleteMilestone={handleDeleteMilestone}
             />
           </div>
 
@@ -438,12 +434,18 @@ const MyProjects: React.FC = () => {
 
       <AddMilestoneModal
         isOpen={isModalOpen}
-        onOk={handleCreateMilestone} // <-- Sử dụng hàm mới
+        onOk={handleCreateMilestone}
         onCancel={() => {
           setIsModalOpen(false);
           form.resetFields();
-        }} // Reset form khi cancel
+        }}
         form={form}
+      />
+
+      {/* --- THÊM MODAL NÂNG CẤP --- */}
+      <UpgradeModal
+        open={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
       />
     </div>
   );

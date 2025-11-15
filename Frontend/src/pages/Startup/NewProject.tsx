@@ -1,505 +1,454 @@
-import React, { useState, type ChangeEvent, type FocusEvent } from "react";
-import { useDispatch } from "react-redux";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { App } from "antd";
-import { createProject } from "../../services/features/project/projectSlice";
-import { type AppDispatch } from "../../store";
-import type { ProjectFormState } from "../../interfaces/project";
+import { useDispatch, useSelector } from "react-redux";
+import { message, Form, Button } from "antd"; // Đã thêm Modal, Button
+import type { RootState, AppDispatch } from "../../store";
+import {
+  getMyProjects,
+  getMilestonesByProject,
+  deleteProject,
+  createMilestone,
+  deleteMilestone,
+} from "../../services/features/project/projectSlice";
+import type { Project as ApiProject } from "../../interfaces/project";
+import type { Milestone as ApiMilestone } from "../../interfaces/milestone";
 import { logActivity } from "../../utils/activityLogger";
+import type {
+  ProjectUI,
+  MilestoneUI,
+} from "../../interfaces/startup/myprojects";
 
 // Import các component con
-import { NewProjectHeader } from "../../components/startup/newproject/NewProjectHeader";
-import { ProjectInfoForm } from "../../components/startup/newproject/ProjectInfoForm";
-import { DocumentsMediaForm } from "../../components/startup/newproject/DocumentsMediaForm";
+import { ProjectPageHeader } from "../../components/startup/myprojects/ProjectPageHeader";
+import { ProjectCarousel } from "../../components/startup/myprojects/ProjectCarousel";
+import { ProjectTimeline } from "../../components/startup/myprojects/ProjectTimeline";
+import { MilestoneList } from "../../components/startup/myprojects/MilestoneList";
+import { ProjectMetrics } from "../../components/startup/myprojects/ProjectMetrics";
+import { QuickActions } from "../../components/startup/myprojects/QuickActions";
+import { AddMilestoneModal } from "../../components/startup/myprojects/AddMilestoneModal";
+// --- THÊM IMPORT MODAL NÂNG CẤP ---
+import { UpgradeModal } from "../../components/startup/myprojects/UpgradeModal";
 
-// ... (Interface ValidationErrors và Type FieldName giữ nguyên) ...
-export interface ValidationErrors {
-  [key: string]: string | undefined;
-  projectName?: string;
-  category?: string;
-  customCategory?: string;
-  fundingStage?: string;
-  fundingRange?: string;
-  teamSize?: string;
-  location?: string;
-  website?: string;
-  description?: string;
-  pitchDeck?: string;
-  pitchVideo?: string;
-  businessPlan?: string;
-  financialProjection?: string;
-}
-type FieldName = keyof ValidationErrors;
+// --- Các hàm helper (formatCurrency, getFundingRangeDisplay, etc.) giữ nguyên ---
+const formatCurrency = (amount: number): string => {
+  if (amount === 0) return "$0";
+  if (amount >= 1000000) {
+    return `$${(amount / 1000000).toFixed(1)}M`;
+  } else if (amount >= 1000) {
+    return `$${(amount / 1000).toFixed(1)}K`;
+  }
+  return `$${amount}`;
+};
 
-const fieldsByStep: FieldName[][] = [
-  // Bước 0: ProjectInfoForm
-  [
-    "projectName",
-    "category",
-    "customCategory",
-    "fundingStage",
-    "fundingRange",
-    "teamSize",
-    "location",
-    "website",
-    "description",
-  ],
-  // Bước 1: DocumentsMediaForm
-  ["pitchDeck", "pitchVideo", "businessPlan", "financialProjection"],
-];
+const getFundingRangeDisplay = (fundingRange: string): string => {
+  const rangeMap: { [key: string]: string } = {
+    UNDER_50K: "UNDER $50K",
+    FROM_50K_TO_200K: "$50K - $200K",
+    FROM_200K_TO_1M: "$200K - $1M",
+    OVER_1M: "Over $1M",
+  };
+  return rangeMap[fundingRange] || "Not specified";
+};
 
-const stepTitles = ["Project Information", "Documents & Media"];
-
-const SubmitNewProject: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
-  const { message } = App.useApp();
-
-  // --- STATE MANAGEMENT ---
-  const [currentStep, setCurrentStep] = useState(0);
-  const totalSteps = stepTitles.length;
-
-  const [formData, setFormData] = useState<ProjectFormState>({
-    projectName: "",
-    category: "",
-    customCategory: "",
-    fundingStage: "",
-    fundingRange: "",
-    teamSize: "",
-    location: "",
-    website: "",
-    description: "",
-    pitchDeck: null,
-    pitchVideo: null,
-    businessPlan: null,
-    financialProjection: null,
+const generateTimeline = (project: ApiProject): ProjectUI["timeline"] => {
+  const stages = ["Initial Review", "Contract Signing", "Funding Completion"];
+  return stages.map((stage) => {
+    let status: "completed" | "in-progress" | "upcoming" = "upcoming";
+    let date = "";
+    if (stage === "Initial Review" && project.createdAt) {
+      date = new Date(project.createdAt).toISOString().split("T")[0];
+    }
+    switch (project.status) {
+      case "DRAFT":
+        if (stage === "Initial Review") status = "in-progress";
+        break;
+      case "PUBLISHED":
+        if (stage === "Initial Review") status = "completed";
+        else if (stage === "Contract Signing") status = "in-progress";
+        break;
+      case "APPROVED":
+        if (["Initial Review", "Contract Signing"].includes(stage))
+          status = "completed";
+        else if (stage === "Funding Completion") status = "in-progress";
+        break;
+      case "COMPLETE":
+        status = "completed";
+        break;
+    }
+    if (status === "completed" && !date) {
+      date = new Date().toISOString().split("T")[0];
+    }
+    return { stage, date, status };
   });
-  const [errors, setErrors] = useState<ValidationErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [submitting, setSubmitting] = useState(false);
+};
 
-  // --- VALIDATION LOGIC --- (Giữ nguyên không đổi)
-  const validateField = (
-    name: FieldName,
-    value: any,
-    currentFormData: ProjectFormState,
-    file?: File | null
-  ): string => {
-    switch (name) {
-      case "projectName":
-        if (!value || value.trim().length === 0)
-          return "Project name is required";
-        if (value.trim().length < 3)
-          return "Project name must be at least 3 characters long";
-        if (value.trim().length > 100)
-          return "Project name must be less than 100 characters";
-        return "";
-      case "category":
-        if (!value) return "Category is required";
-        return "";
-      case "customCategory":
-        if (
-          currentFormData.category === "OTHER" &&
-          (!value || value.trim().length === 0)
-        )
-          return 'Custom category is required when selecting "Other"';
-        if (currentFormData.category === "OTHER" && value.trim().length > 50)
-          return "Custom category must be less than 50 characters";
-        return "";
-      case "fundingStage":
-        if (!value) return "Funding stage is required";
-        return "";
-      case "fundingRange":
-        if (!value) return "Funding range is required";
-        return "";
-      case "teamSize":
-        if (!value) return "Team size is required";
-        const teamSizeNum = parseInt(value);
-        if (isNaN(teamSizeNum) || teamSizeNum < 1 || teamSizeNum > 1000)
-          return "Team size must be between 1 and 1000";
-        return "";
-      case "location":
-        if (!value || value.trim().length === 0) return "Location is required";
-        if (value.trim().length > 100)
-          return "Location must be less than 100 characters";
-        return "";
-      case "website":
-        if (!value || value.trim().length === 0) return "Website is required";
-        if (!isValidUrl(value))
-          return "Please enter a valid URL (e.g., https://example.com)";
-        return "";
-      case "description":
-        if (!value || value.trim().length === 0)
-          return "Description is required";
-        if (value.trim().length < 10)
-          return "Description must be at least 10 characters long";
-        if (value.trim().length > 2000)
-          return "Description must be less than 2000 characters";
-        return "";
-      // File validations
-      case "pitchDeck":
-        return file
-          ? validateFile(file, ["pdf"], 10 * 1024 * 1024)
-          : "Pitch deck is required";
-      case "pitchVideo":
-        return file
-          ? validateFile(file, ["mp4", "mov", "avi"], 100 * 1024 * 1024)
-          : "Pitch video is required";
-      case "businessPlan":
-        return file
-          ? validateFile(file, ["pdf", "doc", "docx"], 10 * 1024 * 1024)
-          : "Business plan is required";
-      case "financialProjection":
-        return file
-          ? validateFile(file, ["pdf", "xls", "xlsx"], 10 * 1024 * 1024)
-          : "Financial projection is required";
-      default:
-        return "";
-    }
-  };
+const calculateProgressFromTimeline = (
+  timeline: ProjectUI["timeline"]
+): number => {
+  const completedStages = timeline.filter(
+    (s) => s.status === "completed"
+  ).length;
+  const inProgressStages = timeline.filter(
+    (s) => s.status === "in-progress"
+  ).length;
+  const progress = completedStages * 33.33 + inProgressStages * 16.67;
+  return Math.min(Math.round(progress), 100);
+};
 
-  const validateFile = (
-    file: File,
-    allowedTypes: string[],
-    maxSize: number
-  ): string => {
-    const fileExtension = file.name.split(".").pop()?.toLowerCase();
-    if (!fileExtension || !allowedTypes.includes(fileExtension))
-      return `Allowed types: ${allowedTypes.join(", ")}`;
-    if (file.size > maxSize) {
-      const maxSizeMB = Math.round(maxSize / (1024 * 1024));
-      return `Max size: ${maxSizeMB}MB`;
-    }
-    return "";
-  };
+const calculateCompletionFromTimeline = (
+  timeline: ProjectUI["timeline"]
+): number => {
+  const totalStages = timeline.length;
+  const completedStages = timeline.filter(
+    (s) => s.status === "completed"
+  ).length;
+  return totalStages > 0
+    ? Math.floor((completedStages / totalStages) * 100)
+    : 0;
+};
+// --- Kết thúc hàm helper ---
 
-  const isValidUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return url.startsWith("http:") || url.startsWith("https:");
-    } catch {
-      return false;
-    }
-  };
+const MyProjects: React.FC = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const [selectedProject, setSelectedProject] = useState<number | null>(null);
+  const [deletingProjectIds, setDeletingProjectIds] = useState<number[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [form] = Form.useForm();
 
-  const validateCurrentStep = (stepIndex: number): boolean => {
-    const fieldsToValidate = fieldsByStep[stepIndex];
-    if (!fieldsToValidate) return true;
+  // --- THÊM STATE CHO MODAL NÂNG CẤP ---
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
-    let isStepValid = true;
-    const newErrors: ValidationErrors = { ...errors };
-    const newTouched: Record<string, boolean> = { ...touched };
+  const {
+    projects: apiProjects,
+    milestones: apiMilestones,
+    status,
+    error,
+  } = useSelector((state: RootState) => state.project);
 
-    fieldsToValidate.forEach((name) => {
-      const value = formData[name as keyof ProjectFormState];
-      const file = value instanceof File ? value : null;
-      const textValue = value instanceof File ? "" : value;
+  // --- LẤY USER TỪ REDUX ---
+  const { user } = useSelector((state: RootState) => state.auth);
 
-      const error = validateField(name, textValue, formData, file);
-      newErrors[name] = error;
-      newTouched[name] = true;
-      if (error) {
-        isStepValid = false;
-      }
-    });
+  // Tính toán danh sách projects UI
+  const projects = useMemo((): ProjectUI[] => {
+    if (!apiProjects || apiProjects.length === 0) return [];
+    return apiProjects.map((project) => {
+      const timeline = generateTimeline(project);
+      const completion = calculateCompletionFromTimeline(timeline);
+      const progress = calculateProgressFromTimeline(timeline);
 
-    setErrors(newErrors);
-    setTouched(newTouched);
-    return isStepValid;
-  };
+      let stageName = "Initial Review";
+      const order: Record<string, number> = {
+        "Initial Review": 0,
+        "Contract Signing": 1,
+        "Funding Completion": 2,
+      };
+      const sortedTimeline = [...timeline].sort(
+        (a, b) => order[a.stage] - order[b.stage]
+      );
 
-  const validateForm = (currentFormData: ProjectFormState): boolean => {
-    let allErrors: ValidationErrors = {};
-    fieldsByStep.forEach((fields) => {
-      fields.forEach((name) => {
-        const value = currentFormData[name as keyof ProjectFormState];
-        const file = value instanceof File ? value : null;
-        const textValue = value instanceof File ? "" : value;
-        const error = validateField(name, textValue, currentFormData, file);
-        if (error) {
-          allErrors[name] = error;
+      let stageStatus: ProjectUI["timeline"][0]["status"] = "upcoming";
+      for (const item of sortedTimeline) {
+        if (item.status === "completed" || item.status === "in-progress") {
+          stageName = item.stage;
+          stageStatus = item.status;
         }
-      });
+      }
+
+      let stage = stageName;
+      if (stageStatus === "in-progress") {
+        stage += " (Currently in progress)";
+      }
+      const lastStage = sortedTimeline[sortedTimeline.length - 1];
+      if (lastStage?.status === "completed") {
+        stage = `${lastStage.stage} (Completed)`;
+      }
+
+      return {
+        id: project.id,
+        title: project.projectName || "Untitled Project",
+        status: project.status || "Unknown",
+        progress,
+        raised: formatCurrency(project.fundingAmount || 0),
+        target: getFundingRangeDisplay(project.fundingRange),
+        stage,
+        timeline,
+        milestones: [], // Sẽ được thêm vào sau trong selectedProjectData
+        metrics: {
+          activeInvestors: project.investorClicks || 0,
+          completedMilestones: 0, // Tạm thời để 0
+          totalMilestones: 0, // Tạm thời để 0
+          completion,
+        },
+      };
     });
+  }, [apiProjects]);
 
-    setErrors(allErrors);
-    return !Object.values(allErrors).some(Boolean);
-  };
+  // Tính toán dữ liệu project được chọn (bao gồm milestones)
+  const selectedProjectData = useMemo(() => {
+    const project = projects.find((p) => p.id === selectedProject);
+    if (!project) return null;
 
-  // --- EVENT HANDLERS --- (Giữ nguyên không đổi)
-  const handleInputChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    const updatedFormData = { ...formData, [name]: value };
-    setFormData(updatedFormData);
-
-    if (touched[name]) {
-      const error = validateField(name as FieldName, value, updatedFormData);
-      setErrors((prev) => ({ ...prev, [name]: error }));
-    }
-  };
-
-  const handleBlur = (
-    e: FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setTouched((prev) => ({ ...prev, [name]: true }));
-
-    const isFileField = fieldsByStep[1].includes(name as FieldName);
-    const fileValue = isFileField
-      ? (formData[name as keyof ProjectFormState] as File | null)
-      : undefined;
-
-    const error = validateField(name as FieldName, value, formData, fileValue);
-    setErrors((prev) => ({ ...prev, [name]: error }));
-  };
-
-  const handleFileChange = (
-    event: ChangeEvent<HTMLInputElement>,
-    fieldName: keyof ProjectFormState
-  ) => {
-    const file = event.target.files?.[0] || null;
-    const updatedFormData = { ...formData, [fieldName]: file };
-    setFormData(updatedFormData);
-    setTouched((prev) => ({ ...prev, [fieldName]: true }));
-
-    const error = validateField(
-      fieldName as FieldName,
-      "",
-      updatedFormData,
-      file
+    const projectMilestones: MilestoneUI[] = (apiMilestones || []).map(
+      (milestone: ApiMilestone) => ({
+        id: milestone.id,
+        label: milestone.title || "Milestone",
+        due: milestone.dueDate
+          ? new Date(milestone.dueDate).toISOString().split("T")[0]
+          : "N/A",
+        description: milestone.description || "",
+      })
     );
-    setErrors((prev) => ({ ...prev, [fieldName]: error }));
 
-    if (error && !file) {
-      event.target.value = "";
+    const completedMilestones = (apiMilestones || []).filter(
+      (m) => m.status === "COMPLETED"
+    ).length;
+    const totalMilestones = projectMilestones.length;
+
+    return {
+      ...project,
+      milestones: projectMilestones,
+      metrics: {
+        ...project.metrics,
+        completedMilestones,
+        totalMilestones,
+      },
+    };
+  }, [projects, selectedProject, apiMilestones]);
+
+  // --- useEffects (giữ nguyên) ---
+  useEffect(() => {
+    dispatch(getMyProjects());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProject) {
+      setSelectedProject(projects[0].id);
+    }
+  }, [projects, selectedProject]);
+
+  useEffect(() => {
+    if (selectedProject) {
+      dispatch(getMilestonesByProject(selectedProject));
+    }
+  }, [selectedProject, dispatch]);
+
+  // --- HÀM HANDLERS ---
+
+  // --- SỬA HÀM handleNewProject ---
+  const handleNewProject = () => {
+    const currentProjectCount = apiProjects?.length || 0;
+    // Lấy limit từ user, mặc định là 2 nếu user chưa load kịp
+    const projectLimit = user?.projectLimit || 2;
+
+    if (currentProjectCount >= projectLimit) {
+      // ĐÃ ĐẠT GIỚI HẠN -> MỞ MODAL NÂNG CẤP
+      setIsUpgradeModalOpen(true);
+    } else {
+      // CHƯA ĐẠT -> CHO TẠO MỚI
+      navigate("/startup/new-project");
     }
   };
 
-  const handleNext = () => {
-    if (validateCurrentStep(currentStep)) {
-      if (currentStep < totalSteps - 1) {
-        setCurrentStep((prev) => prev + 1);
-        window.scrollTo(0, 0);
+  const handleDeleteProject = async (projectId: number) => {
+    const projectToDelete = projects.find((p) => p.id === projectId);
+    if (!projectToDelete) return;
+    const allowedStatuses = ["DRAFT", "REJECTED"];
+    if (allowedStatuses.includes(projectToDelete.status.toUpperCase())) {
+      setDeletingProjectIds((prev) => [...prev, projectId]);
+      try {
+        await dispatch(deleteProject(projectId)).unwrap();
+        logActivity({
+          action: `Deleted project: ${projectToDelete.title}`,
+          timestamp: Date.now(),
+        });
+        message.success("Project deleted successfully");
+        dispatch(getMyProjects());
+        if (selectedProject === projectId) {
+          const remainingProjects = projects.filter((p) => p.id !== projectId);
+          setSelectedProject(
+            remainingProjects.length > 0 ? remainingProjects[0].id : null
+          );
+        }
+      } catch (err: any) {
+        message.error(err || "Failed to delete project");
+      } finally {
+        setDeletingProjectIds((prev) => prev.filter((id) => id !== projectId));
       }
     } else {
-      message.error("Please fix the errors on this page before proceeding.");
+      message.warning(
+        "Projects in this status cannot be deleted. Please contact support."
+      );
     }
   };
 
-  const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep((prev) => prev - 1);
-      window.scrollTo(0, 0);
-    }
-  };
+  const handleDeleteMilestone = async (milestoneId: number) => {
+    if (!selectedProject) return;
 
-  const handleFinalSubmit = (status: string) => {
-    const allTouched = fieldsByStep
-      .flat()
-      .reduce((acc, field) => ({ ...acc, [field]: true }), {});
-    setTouched(allTouched);
+    const milestoneToDelete = apiMilestones?.find((m) => m.id === milestoneId);
+    const currentProject = projects.find((p) => p.id === selectedProject);
 
-    if (!validateForm(formData)) {
-      message.error("Please fix the validation errors before submitting.");
-
-      for (let i = 0; i < fieldsByStep.length; i++) {
-        if (!validateCurrentStep(i)) {
-          setCurrentStep(i);
-          break;
-        }
-      }
-      return;
-    }
-
-    // --- FORM SUBMISSION LOGIC --- (Giữ nguyên)
-    const submitData = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        if (value instanceof File) {
-          submitData.append(key, value, value.name);
-        } else if (typeof value === "string" && value.trim()) {
-          submitData.append(key, value.trim());
-        } else if (typeof value !== "string") {
-          submitData.append(key, String(value));
-        }
-      }
-    });
-    submitData.append("status", status);
-
-    setSubmitting(true);
     message.loading({
-      content: "Creating project...",
-      key: "createProject",
-      duration: 0,
+      content: "Deleting milestone...",
+      key: "deleteMilestone",
     });
-
-    dispatch(createProject(submitData))
-      .unwrap()
-      .then((result) => {
-        if (result && result.id) {
-          logActivity({
-            action: "Created new project",
-            projectId: String(result.id),
-            timestamp: Date.now(),
-          });
-          message.success({
-            content: "Project created successfully!",
-            key: "createProject",
-          });
-          navigate("/startup/my-projects");
-        } else {
-          console.error(
-            "Project creation result did not contain an ID:",
-            result
-          );
-          message.error({
-            content: "Project created, but failed to get project ID.",
-            key: "createProject",
-          });
-          navigate("/startup/my-projects");
-        }
-      })
-      .catch((error: any) => {
-        const errorMessage =
-          typeof error === "string"
-            ? error
-            : error?.payload?.message ||
-              error?.message ||
-              "An unknown error occurred";
-        message.error({
-          content: `Failed to create project: ${errorMessage}`,
-          key: "createProject",
-        });
-      })
-      .finally(() => {
-        setSubmitting(false);
+    try {
+      await dispatch(deleteMilestone(milestoneId)).unwrap();
+      logActivity({
+        action: `Deleted milestone: ${
+          milestoneToDelete?.title || "Milestone"
+        } from project: ${currentProject?.title || "Unknown"}`,
+        projectId: String(selectedProject),
+        timestamp: Date.now(),
       });
+      message.success({ content: "Milestone deleted", key: "deleteMilestone" });
+      dispatch(getMilestonesByProject(selectedProject));
+    } catch (err: any) {
+      message.error({
+        content: err || "Failed to delete milestone",
+        key: "deleteMilestone",
+      });
+    }
   };
 
-  const handleBackToProjects = () => {
-    navigate("/startup/my-projects");
+  const handleCreateMilestone = async () => {
+    if (!selectedProject) return;
+    try {
+      const values = await form.validateFields();
+      const data = {
+        projectId: selectedProject,
+        title: values.title,
+        description: values.description,
+        dueDate: values.dueDate.format("YYYY-MM-DD"),
+        status: "PENDING",
+      };
+      const result = await dispatch(
+        createMilestone({ projectId: selectedProject, data })
+      ).unwrap();
+      logActivity({
+        action: `Created new milestone: ${result.title || "Milestone"}`,
+        projectId: String(selectedProject),
+        timestamp: Date.now(),
+      });
+      dispatch(getMilestonesByProject(selectedProject));
+      message.success("Milestone created successfully");
+      setIsModalOpen(false);
+      form.resetFields();
+    } catch (error: any) {
+      message.error(error || "Failed to create milestone");
+      console.error("Failed to create milestone:", error);
+    }
+  };
+
+  const handleViewDetails = (projectId: number) => {
+    navigate(`/startup/projects/${projectId}`);
   };
 
   // --- RENDER ---
-  return (
-    <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
-      {/* **ĐÃ THAY ĐỔI**: Xóa props `onCreate` và `isLastStep` */}
-      <NewProjectHeader
-        submitting={submitting}
-        onBack={handleBackToProjects}
-        onCreate={function (): void {
-          throw new Error("Function not implemented.");
-        }}
-        isLastStep={false}
-      />
-      <p style={{ color: "#64748b", marginBottom: 24 }}>
-        Create a compelling project profile to attract investors. All fields
-        marked * are required.
-      </p>
 
-      {/* Main form container */}
+  if (status === "loading" && projects.length === 0) {
+    return (
       <div
         style={{
-          background: "#fff",
-          borderRadius: 12,
           padding: 24,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
         }}
       >
-        <div style={{ marginBottom: 24, textAlign: "center" }}>
-          <h3 style={{ color: "#3b82f6", margin: 0 }}>
-            Step {currentStep + 1} of {totalSteps}: {stepTitles[currentStep]}
-          </h3>
-        </div>
+        Loading projects...
+      </div>
+    );
+  }
 
-        {currentStep === 0 && (
-          <ProjectInfoForm
-            formData={formData}
-            errors={errors}
-            touched={touched}
-            handleInputChange={handleInputChange}
-            handleBlur={handleBlur}
-          />
-        )}
+  if (status === "failed" && projects.length === 0) {
+    return (
+      <div style={{ padding: 24, minHeight: "100vh" }}>
+        <div style={{ color: "red", textAlign: "center" }}>Error: {error}</div>
+      </div>
+    );
+  }
 
-        {currentStep === 1 && (
-          <DocumentsMediaForm
-            formData={formData}
-            errors={errors}
-            touched={touched}
-            handleFileChange={handleFileChange}
-          />
-        )}
-
-        {/* **ĐÃ THAY ĐỔI**: Nút điều hướng các bước */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginTop: 32,
-            paddingTop: 24,
-            borderTop: "1px solid #e5e7eb",
-          }}
-        >
-          <button
-            onClick={handlePrevious}
-            disabled={currentStep === 0 || submitting}
-            style={{
-              padding: "8px 16px",
-              background:
-                currentStep === 0 || submitting ? "#d1d5db" : "#6b7280",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              cursor:
-                currentStep === 0 || submitting ? "not-allowed" : "pointer",
-              opacity: currentStep === 0 ? 0.5 : 1,
-            }}
+  if (projects.length === 0 && status === "succeeded") {
+    return (
+      <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
+        <div style={{ textAlign: "center", padding: "40px 0" }}>
+          <h3>No projects found</h3>
+          <p>Create your first project to get started</p>
+          <Button
+            type="primary"
+            size="large"
+            onClick={handleNewProject} // Đã được canh gác
+            style={{ background: "#38bdf8" }}
           >
-            Previous
-          </button>
-
-          {/* Nút "Next" (Chỉ hiển thị khi KHÔNG phải bước cuối) */}
-          {currentStep < totalSteps - 1 && (
-            <button
-              onClick={handleNext}
-              disabled={submitting}
-              style={{
-                padding: "8px 16px",
-                background: submitting ? "#94a3b8" : "#3b82f6",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
-            >
-              Next
-            </button>
-          )}
-
-          {/* Nút "Submit" (Chỉ hiển thị ở BƯỚC CUỐI) */}
-          {currentStep === totalSteps - 1 && (
-            <button
-              onClick={() => handleFinalSubmit("DRAFT")} // Gọi hàm submit
-              disabled={submitting}
-              style={{
-                padding: "8px 16px",
-                background: submitting ? "#94a3b8" : "#3b82f6", // Style giống nút Next
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {submitting ? "Submitting..." : "Submit"}
-            </button>
-          )}
+            Create New Project
+          </Button>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
+      <ProjectPageHeader onNewProject={handleNewProject} />
+
+      <ProjectCarousel
+        projects={projects}
+        selectedProject={selectedProject}
+        deletingProjectIds={deletingProjectIds}
+        onSelectProject={setSelectedProject}
+        onDeleteProject={handleDeleteProject}
+        onViewDetails={handleViewDetails}
+      />
+
+      {selectedProjectData && (
+        <>
+          {/* Middle Section */}
+          <div
+            style={{
+              display: "flex",
+              gap: 24,
+              flexWrap: "wrap",
+              marginBottom: 24,
+            }}
+          >
+            <ProjectTimeline
+              title={selectedProjectData.title}
+              timeline={selectedProjectData.timeline}
+            />
+            <MilestoneList
+              milestones={selectedProjectData.milestones}
+              onAddMilestone={() => setIsModalOpen(true)}
+              onDeleteMilestone={handleDeleteMilestone}
+            />
+          </div>
+
+          {/* Metrics & Quick Actions */}
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+            <ProjectMetrics metrics={selectedProjectData.metrics} />
+            <QuickActions />
+          </div>
+        </>
+      )}
+
+      <AddMilestoneModal
+        isOpen={isModalOpen}
+        onOk={handleCreateMilestone}
+        onCancel={() => {
+          setIsModalOpen(false);
+          form.resetFields();
+        }}
+        form={form}
+      />
+
+      {/* --- THÊM MODAL NÂNG CẤP --- */}
+      <UpgradeModal
+        open={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+      />
     </div>
   );
 };
 
-export default SubmitNewProject;
+export default MyProjects;

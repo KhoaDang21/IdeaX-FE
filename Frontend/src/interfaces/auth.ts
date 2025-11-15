@@ -27,6 +27,8 @@ export interface User {
   investmentRange?: string;
   investmentExperience?: string;
   twoFactorEnabled?: boolean;
+  projectLimit: number;
+  walletBalance: number;
 }
 
 export interface LoginCredentials {
