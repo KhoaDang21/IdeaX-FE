@@ -122,31 +122,6 @@ const Login: FC = () => {
                             <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang nhập...' : 'Sign In'}</button>
                         </form>
 
-                        <p style={{ textAlign: 'center', margin: '16px 0', color: '#64748b', fontSize: 14 }}>Or continue with</p>
-                        <div style={{ display: 'flex', gap: 12 }}>
-                            <button
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 8,
-                                    padding: '10px 16px',
-                                    width: '100%',
-                                    borderRadius: 10,
-                                    border: '1px solid #e2e8f0',
-                                    background: '#fff',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <img
-                                    src="https://www.svgrepo.com/show/355037/google.svg"
-                                    alt="Google logo"
-                                    style={{ width: 20, height: 20 }}
-                                />
-                                <span>Google</span>
-                            </button>
-                        </div>
-
                         <p style={{ textAlign: 'center', marginTop: 14, color: '#64748b', fontSize: 14 }}>Don't have an account? <Link to="/start" style={{ color: '#4f46e5', textDecoration: 'none' }}>Sign up for free</Link></p>
                         <p style={{ textAlign: 'center', marginTop: 8 }}>
                             <Link to="/" style={{ color: '#64748b', textDecoration: 'none' }}>← Back to Home</Link>
