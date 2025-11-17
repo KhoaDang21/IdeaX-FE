@@ -77,7 +77,7 @@ const InvestorHeader: FC = () => {
                         <img
                             src={logo}
                             alt="IdeaX"
-                            style={{ width: 36, height: 36, borderRadius: 8 }}
+                            style={{ width: 48, height: 48, borderRadius: 8 }}
                         />
                     </Link>
                 </div>
@@ -89,14 +89,14 @@ const InvestorHeader: FC = () => {
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        gap: 40,
+                        gap: 80,
                         whiteSpace: 'nowrap',
                     }}
                 >
                     {[
                         { to: '/investor/find-projects', label: 'Find Projects' },
-                        { to: '/investor/progress-tracking', label: 'Project Tracking' },
-                        { to: '/investor/invested-projects', label: 'Invested Projects' },
+                        // { to: '/investor/progress-tracking', label: 'Project Tracking' },
+                        // { to: '/investor/invested-projects', label: 'Invested Projects' },
                         { to: '/investor/room', label: 'Roomeet' },
                         { to: '/investor/payments', label: 'Payments' },
                     ].map((link) => (
@@ -106,6 +106,7 @@ const InvestorHeader: FC = () => {
                             style={({ isActive }) => ({
                                 color: isActive ? '#27348B' : '#4b5563',
                                 fontWeight: isActive ? 700 : 500,
+                                fontSize: 16,
                                 textDecoration: 'none',
                             })}
                         >
@@ -154,8 +155,8 @@ const InvestorHeader: FC = () => {
                                     src={user.profilePictureUrl}
                                     alt="avatar"
                                     style={{
-                                        width: 36,
-                                        height: 36,
+                                        width: 44,
+                                        height: 44,
                                         borderRadius: '50%',
                                         objectFit: 'cover',
                                     }}
