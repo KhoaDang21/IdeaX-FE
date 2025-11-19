@@ -22,7 +22,6 @@ import {
   Space,
   message,
   Popconfirm,
-  Spin,
   Empty,
   Statistic,
   Modal,
@@ -40,6 +39,7 @@ import {
   PlayCircleOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import InlineLoading from '../../components/InlineLoading'
 
 const { Title, Text } = Typography;
 
@@ -78,6 +78,7 @@ const ProjectManagement: React.FC = () => {
   useEffect(() => {
     dispatch(getAllProjects());
   }, [dispatch]);
+
 
   // Tách dự án
   const [pendingProjects, activeProjects] = useMemo(() => {
@@ -328,7 +329,7 @@ const ProjectManagement: React.FC = () => {
           height: "80vh",
         }}
       >
-        <Spin size="large" />
+        <InlineLoading />
       </div>
     );
   }

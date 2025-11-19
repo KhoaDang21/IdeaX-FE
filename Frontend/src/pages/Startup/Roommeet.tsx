@@ -22,9 +22,9 @@ import {
   Empty,
   Card,
   Modal,
-  Spin,
   Descriptions,
 } from "antd";
+import InlineLoading from '../../components/InlineLoading'
 import {
   VideoCameraOutlined,
   EditOutlined,
@@ -391,14 +391,15 @@ const Roommeet: React.FC = () => {
           Meeting Rooms
         </Title>
 
-        {meetingsState.meetings.length === 0 ? (
+        {meetingsState.loading ? (
+          <InlineLoading />
+        ) : meetingsState.meetings.length === 0 ? (
           <Empty description="Chưa có meeting nào" />
         ) : (
           <Table
             columns={columns}
             dataSource={meetingsState.meetings}
             rowKey="id"
-            loading={meetingsState.loading}
             pagination={{ pageSize: 10 }}
           />
         )}
@@ -417,8 +418,7 @@ const Roommeet: React.FC = () => {
       >
         {loadingDetails ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>
-            <Spin size="large" />
-            <div style={{ marginTop: 10 }}>Đang tải thông tin meeting...</div>
+            <InlineLoading message="Đang tải thông tin meeting..." />
           </div>
         ) : (
           <div style={{ minHeight: 120 }}>

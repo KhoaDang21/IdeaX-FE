@@ -23,6 +23,7 @@ import {
     Typography,
     message,
 } from "antd";
+import InlineLoading from '../../components/InlineLoading'
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import dayjs from "dayjs";
 
@@ -625,27 +626,30 @@ const Payments: React.FC = () => {
                     Refresh
                 </Button>
             </div>
-            <Table<TransactionResponse>
-                rowKey={(record) => record.id}
-                columns={columns}
-                dataSource={transactions}
-                loading={transactionsLoading}
-                locale={{
-                    emptyText: (
-                        <Empty
-                            description="No transactions yet"
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        />
-                    ),
-                }}
-                pagination={{
-                    current: transactionPage,
-                    pageSize: transactionPageSize,
-                    total: transactionsPage?.totalElements ?? transactions.length,
-                    showSizeChanger: true,
-                }}
-                onChange={handleTableChange}
-            />
+            {transactionsLoading && transactions.length === 0 ? (
+                <InlineLoading />
+            ) : (
+                <Table<TransactionResponse>
+                    rowKey={(record) => record.id}
+                    columns={columns}
+                    dataSource={transactions}
+                    locale={{
+                        emptyText: (
+                            <Empty
+                                description="No transactions yet"
+                                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            />
+                        ),
+                    }}
+                    pagination={{
+                        current: transactionPage,
+                        pageSize: transactionPageSize,
+                        total: transactionsPage?.totalElements ?? transactions.length,
+                        showSizeChanger: true,
+                    }}
+                    onChange={handleTableChange}
+                />
+            )}
         </Card>
     );
 
@@ -793,7 +797,7 @@ const Payments: React.FC = () => {
                     gap: 16,
                 }}
             >
-                <Spin size="large" />
+                <InlineLoading message="Loading payment information..." />
                 <Text type="secondary">Loading payment information...</Text>
             </div>
         );
