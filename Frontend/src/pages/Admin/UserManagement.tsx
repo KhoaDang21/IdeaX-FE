@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import InlineLoading from '../../components/InlineLoading'
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { Table, Avatar, Tag, Input, Select, Space, Spin, message, Card, Row, Col, Button, Drawer, Modal } from "antd";
+import { Table, Avatar, Tag, Input, Select, Space, message, Card, Row, Col, Button, Drawer, Modal } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
     EyeOutlined,
@@ -478,7 +479,7 @@ const UserManagement: React.FC = () => {
 
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: '50px' }}>
-                        <Spin size="large" />
+                        <InlineLoading />
                     </div>
                 ) : (
                     <Table<DisplayUser>

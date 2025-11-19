@@ -19,9 +19,9 @@ import {
     Empty,
     Divider,
     Modal,
-    Spin,
     Descriptions,
 } from "antd";
+import InlineLoading from '../../components/InlineLoading'
 import {
     VideoCameraOutlined,
     CalendarOutlined,
@@ -315,7 +315,9 @@ const Room: React.FC = () => {
                 </div>
 
                 {/* Meeting List */}
-                {meetingsState.meetings.length === 0 ? (
+                {meetingsState.loading ? (
+                    <InlineLoading />
+                ) : meetingsState.meetings.length === 0 ? (
                     <div
                         style={{
                             background: "white",
@@ -554,8 +556,7 @@ const Room: React.FC = () => {
             >
                 {loadingDetails ? (
                     <div style={{ textAlign: 'center', padding: '40px' }}>
-                        <Spin size="large" />
-                        <div style={{ marginTop: 10 }}>Đang tải thông tin meeting...</div>
+                        <InlineLoading message="Đang tải thông tin meeting..." />
                     </div>
                 ) : (
                     <div style={{ minHeight: 120 }}>

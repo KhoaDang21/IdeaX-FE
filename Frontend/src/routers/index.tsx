@@ -4,6 +4,7 @@ import App from "../App";
 import StartupLayout from "../components/StartupLayout";
 import InvestorLayout from "../components/InvestorLayout";
 import AdminLayout from "../components/AdminLayout";
+import GlobalLoading from "../components/GlobalLoading";
 
 // Lazy-loaded pages to split bundles and reduce main chunk size
 const Home = React.lazy(() => import("../pages/Home"));
@@ -32,7 +33,7 @@ const ProjectDetailsadmin = React.lazy(() => import("../pages/Admin/ProjectDetai
 // admin layout moved to components/AdminLayout
 
 export default function AppRoutes() {
-  const Fallback = <div style={{ padding: 20 }}>Đang tải...</div>;
+  const Fallback = <GlobalLoading />;
 
   return (
     <Suspense fallback={Fallback}>

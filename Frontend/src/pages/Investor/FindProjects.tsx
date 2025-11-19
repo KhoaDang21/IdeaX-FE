@@ -5,7 +5,8 @@ import { createMeeting } from "../../services/features/meeting/meetingSlice";
 import type { RootState, AppDispatch } from "../../store";
 import type { Project } from "../../interfaces/project";
 import type { MeetingFormData } from "../../interfaces/meeting";
-import { Button, Typography, Row, Space, message, Spin, Empty } from "antd";
+import { Button, Typography, Row, Space, message, Empty } from "antd";
+import InlineLoading from '../../components/InlineLoading'
 import { useNavigate } from "react-router-dom";
 import type { Dayjs } from "dayjs";
 
@@ -119,7 +120,7 @@ const FindProjects: React.FC = () => {
           gap: 16,
         }}
       >
-        <Spin size="large" />
+        <InlineLoading message="Loading investment opportunities..." />
         <Text type="secondary">Loading investment opportunities...</Text>
       </div>
     );

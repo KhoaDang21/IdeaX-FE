@@ -7,9 +7,9 @@ import {
   Select,
   Input,
   message,
-  Spin,
   Empty,
 } from "antd";
+import InlineLoading from '../../components/InlineLoading'
 import dayjs from "dayjs";
 
 // Import từ store của bạn
@@ -366,7 +366,7 @@ const Payment: React.FC = () => {
 
         {status === "loading" && transactions.length === 0 ? (
           <div style={{ textAlign: "center", padding: 20 }}>
-            <Spin />
+            <InlineLoading />
           </div>
         ) : transactions.length === 0 ? (
           <Empty description="No transactions found" />

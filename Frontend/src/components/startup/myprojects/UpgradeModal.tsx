@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Button, Card, Spin, message, Typography } from "antd";
+import { Modal, Button, Card, message, Typography } from "antd";
+import InlineLoading from '../../InlineLoading'
 import { useSelector, useDispatch } from "react-redux";
 import { type RootState, type AppDispatch } from "../../../store";
 import { fetchPackages } from "../../../services/features/payment/packageSlice";
@@ -82,7 +83,7 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
         Số dư ví của bạn: {walletBalance.toLocaleString("vi-VN")} VNĐ
       </Text>
 
-      {loading && <Spin />}
+      {loading && <InlineLoading />}
       {!loading &&
         packages.map((pkg) => (
           <Card key={pkg.id} style={{ marginTop: 16 }}>

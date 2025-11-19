@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import StartupHeader from './StartupHeader'
 import StartupSidebar from './StartupSidebar'
 import { useEffect, useState } from 'react'
+import GlobalLoading from './GlobalLoading'
 
 const StartupLayout = () => {
     const location = useLocation()
@@ -47,9 +48,7 @@ const StartupLayout = () => {
 
                 <main style={{ flex: 1, padding: 16, background: '#ffffff', position: 'relative' }}>
                     {routeLoading && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5 }}>
-                            <div style={{ padding: 12, background: '#fff', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', color: '#34419A', fontWeight: 600 }}>Loading...</div>
-                        </div>
+                        <GlobalLoading />
                     )}
                     <Outlet />
                 </main>

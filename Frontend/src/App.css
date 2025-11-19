@@ -6,3 +6,53 @@
 img { max-width: 100%; display: block; }
 
 main { color: #0f172a; }
+
+/* Global loading overlay used across the app */
+.global-loading-overlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255,255,255,0.65);
+	z-index: 9999;
+}
+
+.global-loading-spinner {
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	border: 6px solid #dbeafe; /* light blue track */
+	border-top-color: #34419A; /* active blue */
+	animation: global-spin 1s linear infinite;
+}
+
+@keyframes global-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* Inline four-dot loading used inside cards/tables */
+.inline-dots {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.inline-dot {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: rgba(52,65,154,0.12);
+	box-shadow: 0 0 0 4px rgba(63,199,244,0.06) inset;
+	margin: 0 6px;
+	position: relative;
+	animation: inline-bounce 1s infinite ease-in-out;
+}
+.inline-dot:nth-child(1) { background: #CFE8FF; animation-delay: 0s }
+.inline-dot:nth-child(2) { background: #7FB8FF; animation-delay: 0.12s }
+.inline-dot:nth-child(3) { background: #4F8CFF; animation-delay: 0.24s }
+.inline-dot:nth-child(4) { background: #274EFF; animation-delay: 0.36s }
+
+@keyframes inline-bounce {
+	0%, 100% { transform: translateY(0); opacity: 0.9 }
+	50% { transform: translateY(-8px); opacity: 1 }
+}
