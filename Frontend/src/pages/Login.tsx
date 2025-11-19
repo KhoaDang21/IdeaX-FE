@@ -60,24 +60,24 @@ const Login: FC = () => {
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         let newErrors: Record<string, string> = {};
-        if (!email.trim()) newErrors.email = 'Vui lòng nhập email';
-        else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
-        if (!password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu';
-        else if (password.length < 6) newErrors.password = 'Mật khẩu tối thiểu 6 ký tự';
+        if (!email.trim()) newErrors.email = 'Please enter your email';
+        else if (!validateEmail(email)) newErrors.email = 'Invalid email address';
+        if (!password.trim()) newErrors.password = 'Please enter your password';
+        else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
-            message.error('Vui lòng điền đầy đủ và đúng thông tin các trường bắt buộc.');
+            message.error('Please fill in all required fields correctly.');
             return;
         }
         setSubmitting(true);
-        message.loading({ content: 'Đang đăng nhập...', key: 'login', duration: 0 });
+        message.loading({ content: 'Signing in...', key: 'login', duration: 0 });
         (dispatch(loginUser({ email, password }) as any))
             .unwrap()
             .then(() => {
-                message.success({ content: 'Đăng nhập thành công!', key: 'login' });
+                message.success({ content: 'Login successful!', key: 'login' });
             })
             .catch(() => {
-                message.error({ content: 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.', key: 'login' });
+                message.error({ content: 'Login failed. Please check your credentials.', key: 'login' });
             })
             .finally(() => setSubmitting(false));
     };
@@ -119,7 +119,7 @@ const Login: FC = () => {
                                 <Link to="#" style={{ color: '#4f46e5', fontSize: 14, textDecoration: 'none' }}>Forgot your password?</Link>
                             </div>
 
-                            <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Đang nhập...' : 'Sign In'}</button>
+                            <button type="submit" disabled={loading || submitting} style={{ width: '100%', padding: '12px 16px', background: '#34419A', color: '#fff', border: 0, borderRadius: 10, cursor: 'pointer', marginTop: 6 }}>{loading || submitting ? 'Signing in...' : 'Sign In'}</button>
                         </form>
 
                         <p style={{ textAlign: 'center', marginTop: 14, color: '#64748b', fontSize: 14 }}>Don't have an account? <Link to="/start" style={{ color: '#4f46e5', textDecoration: 'none' }}>Sign up for free</Link></p>

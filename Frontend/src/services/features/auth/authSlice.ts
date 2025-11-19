@@ -76,12 +76,12 @@ export const loginUser = createAsyncThunk<
       const data = response.data;
       // If backend returns a banned account, treat as failure
       if (data?.account?.status === "BANNED") {
-        return rejectWithValue({ message: "Tài khoản của bạn đã bị khóa" });
+        return rejectWithValue({ message: "Your account has been locked" });
       }
       return data;
     } catch (err: any) {
       const message =
-        err.response?.data?.message || err.message || "Đăng nhập thất bại";
+        err.response?.data?.message || err.message || "Login failed";
       return rejectWithValue({ message });
     }
   }
@@ -101,7 +101,8 @@ export const registerStartup = createAsyncThunk<
   ) => {
     try {
       // Dùng `api.post`
-      const response = await api.post(REGISTER_STARTUP_ENDPOINT, data, { //
+      const response = await api.post(REGISTER_STARTUP_ENDPOINT, data, {
+        //
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -111,7 +112,7 @@ export const registerStartup = createAsyncThunk<
       const message =
         err.response?.data?.message ||
         err.message ||
-        "Đăng ký startup thất bại";
+        "Startup registration failed";
       return rejectWithValue({ message });
     }
   }
@@ -137,7 +138,7 @@ export const registerInvestor = createAsyncThunk<
       const message =
         err.response?.data?.message ||
         err.message ||
-        "Đăng ký investor thất bại";
+        "Investor registration failed";
       return rejectWithValue({ message });
     }
   }
@@ -156,7 +157,7 @@ export const getStartupProfile = createAsyncThunk<
     const message =
       err.response?.data?.message ||
       err.message ||
-      "Lấy thông tin profile thất bại";
+      "Failed to fetch profile information";
     return rejectWithValue({ message });
   }
 });
@@ -174,7 +175,7 @@ export const getInvestorProfile = createAsyncThunk<
     const message =
       err.response?.data?.message ||
       err.message ||
-      "Lấy thông tin investor thất bại";
+      "Failed to fetch investor information";
     return rejectWithValue({ message });
   }
 });
@@ -197,7 +198,7 @@ export const updateInvestorProfile = createAsyncThunk<
       const message =
         err.response?.data?.message ||
         err.message ||
-        "Cập nhật investor thất bại";
+        "Investor profile update failed";
       return rejectWithValue({ message });
     }
   }
@@ -243,7 +244,7 @@ const authSlice = createSlice({
       state.error = null;
       localStorage.removeItem("user");
       localStorage.removeItem("token");
-      message.success({ content: "Đăng xuất thành công", key: "logout" });
+      message.success({ content: "Logged out successfully", key: "logout" });
     },
     clearError: (state: AuthState) => {
       state.error = null;
@@ -264,7 +265,7 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: LoginResponse }) => {
           state.loading = false;
           const backendAccount = action.payload.account;
-          
+
           if (backendAccount.status === "BANNED") {
             // ... (code xử lý BANNED giữ nguyên)
             return;
@@ -272,10 +273,10 @@ const authSlice = createSlice({
 
           const startupProfile = action.payload.startupProfile;
           const investorProfile = action.payload.investorProfile;
-          
+
           // --- SỬA ĐỔI TẠI ĐÂY ---
           // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
-          const backendAccountData = backendAccount as any; 
+          const backendAccountData = backendAccount as any;
 
           const normalizedUser: User = {
             id: String(backendAccount.id),
@@ -309,7 +310,7 @@ const authSlice = createSlice({
               startupProfile?.linkedInProfile,
             twoFactorEnabled:
               (investorProfile as any)?.twoFactorEnabled ?? undefined,
-              
+
             // --- THÊM 2 DÒNG NÀY ---
             // Đọc projectLimit và walletBalance từ API đăng nhập
             // Nếu BE không trả về, gán giá trị mặc định
@@ -330,7 +331,7 @@ const authSlice = createSlice({
             localStorage.setItem("token", backendAccount.token);
           }
 
-          message.success("Đăng nhập thành công");
+          message.success("Login successful");
         }
       )
       .addCase(
@@ -338,7 +339,7 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload?: { message: string } }) => {
           state.loading = false;
           state.isAuthenticated = false;
-          state.error = action.payload?.message || "Đăng nhập thất bại";
+          state.error = action.payload?.message || "Login failed";
           message.error(state.error);
         }
       )
@@ -349,13 +350,14 @@ const authSlice = createSlice({
       .addCase(registerStartup.fulfilled, (state: AuthState) => {
         state.loading = false;
         state.error = null;
-        message.success("Đăng ký startup thành công!");
+        message.success("Startup registration successful!");
       })
       .addCase(
         registerStartup.rejected,
         (state: AuthState, action: { payload?: { message: string } }) => {
           state.loading = false;
-          state.error = action.payload?.message || "Đăng ký startup thất bại";
+          state.error =
+            action.payload?.message || "Startup registration failed";
           message.error(state.error);
         }
       )
@@ -366,13 +368,14 @@ const authSlice = createSlice({
       .addCase(registerInvestor.fulfilled, (state: AuthState) => {
         state.loading = false;
         state.error = null;
-        message.success("Đăng ký investor thành công!");
+        message.success("Investor registration successful!");
       })
       .addCase(
         registerInvestor.rejected,
         (state: AuthState, action: { payload?: { message: string } }) => {
           state.loading = false;
-          state.error = action.payload?.message || "Đăng ký investor thất bại";
+          state.error =
+            action.payload?.message || "Investor registration failed";
           message.error(state.error);
         }
       )
@@ -385,7 +388,6 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: StartupProfileResponse }) => {
           state.loading = false;
           if (state.user) {
-            
             // --- SỬA ĐỔI TẠI ĐÂY ---
             // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
             const profileData = action.payload as any;
@@ -412,8 +414,10 @@ const authSlice = createSlice({
 
               // --- THÊM 2 DÒNG NÀY ---
               // Cập nhật projectLimit/walletBalance khi refresh profile
-              projectLimit: profileData.projectLimit ?? state.user.projectLimit ?? 2,
-              walletBalance: profileData.walletBalance ?? state.user.walletBalance ?? 0,
+              projectLimit:
+                profileData.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance:
+                profileData.walletBalance ?? state.user.walletBalance ?? 0,
             };
             // --- KẾT THÚC SỬA ĐỔI ---
 
@@ -428,7 +432,7 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload?: { message: string } }) => {
           state.loading = false;
           state.error =
-            action.payload?.message || "Lấy thông tin profile thất bại";
+            action.payload?.message || "Failed to fetch profile information";
           message.error(state.error);
         }
       )
@@ -441,7 +445,6 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: StartupProfileResponse }) => {
           state.loading = false;
           if (state.user) {
-
             // --- SỬA ĐỔI TẠI ĐÂY ---
             // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
             const profileData = action.payload as any;
@@ -467,23 +470,25 @@ const authSlice = createSlice({
               aboutUs: profileData.aboutUs,
 
               // --- THÊM 2 DÒNG NÀY ---
-              projectLimit: profileData.projectLimit ?? state.user.projectLimit ?? 2,
-              walletBalance: profileData.walletBalance ?? state.user.walletBalance ?? 0,
+              projectLimit:
+                profileData.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance:
+                profileData.walletBalance ?? state.user.walletBalance ?? 0,
             };
             // --- KẾT THÚC SỬA ĐỔI ---
-            
+
             // Cập nhật localStorage
             localStorage.setItem("user", JSON.stringify(state.user));
           }
           state.error = null;
-          message.success("Cập nhật profile thành công");
+          message.success("Profile updated successfully");
         }
       )
       .addCase(
         updateStartupProfile.rejected,
         (state: AuthState, action: { payload?: { message: string } }) => {
           state.loading = false;
-          state.error = action.payload?.message || "Cập nhật profile thất bại";
+          state.error = action.payload?.message || "Profile update failed";
           message.error(state.error);
         }
       )
@@ -498,7 +503,6 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: any }) => {
           state.loading = false;
           if (state.user) {
-            
             // --- SỬA ĐỔI TẠI ĐÂY ---
             state.user = {
               ...state.user,
@@ -523,10 +527,12 @@ const authSlice = createSlice({
                 action.payload.linkedInUrl || state.user.linkedInProfile,
               twoFactorEnabled:
                 action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
-                
+
               // --- THÊM 2 DÒNG NÀY ---
-              projectLimit: action.payload.projectLimit ?? state.user.projectLimit ?? 2,
-              walletBalance: action.payload.walletBalance ?? state.user.walletBalance ?? 0,
+              projectLimit:
+                action.payload.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance:
+                action.payload.walletBalance ?? state.user.walletBalance ?? 0,
             };
             // --- KẾT THÚC SỬA ĐỔI ---
 
@@ -540,7 +546,7 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload?: { message: string } }) => {
           state.loading = false;
           state.error =
-            action.payload?.message || "Lấy thông tin investor thất bại";
+            action.payload?.message || "Failed to fetch investor information";
           message.error(state.error);
         }
       )
@@ -553,7 +559,6 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: any }) => {
           state.loading = false;
           if (state.user) {
-
             // --- SỬA ĐỔI TẠI ĐÂY ---
             state.user = {
               ...state.user,
@@ -575,22 +580,25 @@ const authSlice = createSlice({
                 action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
 
               // --- THÊM 2 DÒNG NÀY ---
-              projectLimit: action.payload.projectLimit ?? state.user.projectLimit ?? 2,
-              walletBalance: action.payload.walletBalance ?? state.user.walletBalance ?? 0,
+              projectLimit:
+                action.payload.projectLimit ?? state.user.projectLimit ?? 2,
+              walletBalance:
+                action.payload.walletBalance ?? state.user.walletBalance ?? 0,
             };
             // --- KẾT THÚC SỬA ĐỔI ---
-            
+
             localStorage.setItem("user", JSON.stringify(state.user));
           }
           state.error = null;
-          message.success("Cập nhật profile investor thành công");
+          message.success("Investor profile updated successfully");
         }
       )
       .addCase(
         updateInvestorProfile.rejected,
         (state: AuthState, action: { payload?: { message: string } }) => {
           state.loading = false;
-          state.error = action.payload?.message || "Cập nhật investor thất bại";
+          state.error =
+            action.payload?.message || "Investor profile update failed";
           message.error(state.error);
         }
       );

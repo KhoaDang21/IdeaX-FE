@@ -63,7 +63,7 @@ const FindProjects: React.FC = () => {
     values: MeetingFormData & { meetingTime: Dayjs }
   ) => {
     if (!authUser) {
-      message.error("Vui lòng đăng nhập trước khi tạo room");
+      message.error("Please log in before creating a room");
       return;
     }
     if (!selected) return;
@@ -86,12 +86,12 @@ const FindProjects: React.FC = () => {
       };
 
       await dispatch(createMeeting(payload)).unwrap();
-      message.success("Tạo room thành công");
+      message.success("Room created successfully");
       setShowMeetingForm(false);
       setModalOpen(false); // Đóng cả 2 modal
       navigate("/investor/room");
     } catch (err: any) {
-      message.error(err?.message || "Tạo room thất bại");
+      message.error(err?.message || "Failed to create room");
     } finally {
       setIsCreatingMeeting(false);
     }

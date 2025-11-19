@@ -26,8 +26,8 @@ import {
 const formatCurrency = (value?: string | number) => {
   if (value === undefined || value === null) return "-";
   const numeric = typeof value === "string" ? Number(value) : value;
-  return new Intl.NumberFormat("vi-VN", {
-    // Sửa thành "vi-VN"
+  return new Intl.NumberFormat("en-US", {
+    // Display using English locale formatting but currency is VND
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
@@ -102,7 +102,7 @@ const Payment: React.FC = () => {
         createDeposit({ amount, paymentMethod: method })
       ).unwrap();
 
-      message.success("Tạo yêu cầu nạp tiền thành công!");
+      message.success("Deposit request created successfully!");
 
       // Backend trả về redirectUrl hoặc paymentUrl
       const url = res.redirectUrl || res.paymentUrl;
@@ -114,7 +114,7 @@ const Payment: React.FC = () => {
       depositForm.resetFields();
       fetchData(); // Tải lại data
     } catch (err: any) {
-      message.error(err.message || "Lỗi nạp tiền");
+      message.error(err.message || "Error during deposit");
     }
   };
   // --- KẾT THÚC SỬA ---
@@ -131,12 +131,12 @@ const Payment: React.FC = () => {
         })
       ).unwrap();
 
-      message.success("Gửi yêu cầu rút tiền thành công!");
+      message.success("Withdrawal request submitted successfully!");
       setWithdrawModalOpen(false);
       withdrawForm.resetFields();
       fetchData(); // Tải lại data
     } catch (err: any) {
-      message.error(err.message || "Lỗi rút tiền");
+      message.error(err.message || "Error during withdrawal");
     }
   };
 

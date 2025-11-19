@@ -75,12 +75,12 @@ const Profile: React.FC = () => {
     const errors: Record<string, string> = {};
 
     // Validate required fields
-    if (!form.fullName.trim()) errors.fullName = 'Họ tên không được để trống';
-    if (!form.startupName.trim()) errors.startupName = 'Tên startup không được để trống';
+    if (!form.fullName.trim()) errors.fullName = 'Full name is required';
+    if (!form.startupName.trim()) errors.startupName = 'Startup name is required';
 
     // Validate email format (if provided)
     if (form.linkedInProfile && !form.linkedInProfile.includes('linkedin.com')) {
-      errors.linkedInProfile = 'LinkedIn profile phải là URL hợp lệ';
+      errors.linkedInProfile = 'LinkedIn profile must be a valid URL';
     }
 
     // Validate website URL (if provided)
@@ -88,7 +88,7 @@ const Profile: React.FC = () => {
       try {
         new URL(form.companyWebsite);
       } catch {
-        errors.companyWebsite = 'Website phải là URL hợp lệ (ví dụ: https://example.com)';
+        errors.companyWebsite = 'Website must be a valid URL (e.g., https://example.com)';
       }
     }
 
@@ -108,9 +108,9 @@ const Profile: React.FC = () => {
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
 
       if (profilePictureFile.size > maxSize) {
-        errors.profilePicture = 'File ảnh không được vượt quá 2MB';
+        errors.profilePicture = 'Profile image must not exceed 2MB';
       } else if (!allowedTypes.includes(profilePictureFile.type)) {
-        errors.profilePicture = 'Chỉ chấp nhận file ảnh (JPG, PNG, GIF)';
+        errors.profilePicture = 'Only image files (JPG, PNG, GIF) are accepted';
       }
     }
 
@@ -124,7 +124,7 @@ const Profile: React.FC = () => {
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      message.error('Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới');
+      message.error('Please check the information and fix the errors below');
       return;
     }
 
@@ -148,17 +148,17 @@ const Profile: React.FC = () => {
       formData.append('profilePictureUrl', profilePictureFile);
     }
 
-    message.loading({ content: 'Đang lưu...', key: 'profile', duration: 0 })
+    message.loading({ content: 'Saving...', key: 'profile', duration: 0 })
       ; (dispatch(updateStartupProfile({
         accountId: user.id,
         profileData: formData
       }) as any))
         .unwrap()
         .then(() => {
-          message.success({ content: 'Lưu profile thành công', key: 'profile' })
+          message.success({ content: 'Profile saved successfully', key: 'profile' })
         })
         .catch((err: any) => {
-          message.error({ content: err?.message || 'Lưu thất bại', key: 'profile' })
+          message.error({ content: err?.message || 'Save failed', key: 'profile' })
         })
   };
 

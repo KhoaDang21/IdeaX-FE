@@ -1,6 +1,6 @@
 import type { FC, CSSProperties, ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Folder, Briefcase, Users, User, CreditCard, Plus, MessageCircle } from 'lucide-react'
+import { Search, Users, CreditCard, User } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../store'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
@@ -54,7 +54,7 @@ const NavItem: FC<{ to: string; icon: ReactNode; label: string }> = ({ to, icon,
   )
 }
 
-const StartupSidebar: FC = () => {
+const InvestorSidebar: FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
   const navigate = useNavigate()
 
@@ -66,27 +66,24 @@ const StartupSidebar: FC = () => {
         : 'U'
 
   const menuItems = [
-    { to: '/startup/dashboard', icon: <Folder size={18} />, label: 'Dashboard' },
-    { to: '/startup/my-projects', icon: <Briefcase size={18} />, label: 'My Projects' },
-    { to: '/startup/roommeet', icon: <Users size={18} />, label: 'Roommeet' },
-    { to: '/startup/profile', icon: <User size={18} />, label: 'Profile' },
-    { to: '/startup/payment', icon: <CreditCard size={18} />, label: 'Payment' }
+    { to: '/investor/find-projects', icon: <Search size={18} />, label: 'Find Projects' },
+    { to: '/investor/room', icon: <Users size={18} />, label: 'Roomeet' },
+    { to: '/investor/payments', icon: <CreditCard size={18} />, label: 'Payments' },
+    { to: '/investor/profile-investor', icon: <User size={18} />, label: 'Profile' }
   ]
 
   const actions = [
-    { icon: <Plus size={18} />, label: 'Create New Project', onClick: () => navigate('/startup/new-project') },
-    { icon: <MessageCircle size={18} />, label: 'Join Room', onClick: () => navigate('/startup/roommeet') },
-    { icon: <CreditCard size={18} />, label: 'Manage Wallet', onClick: () => navigate('/startup/payment') }
+    { icon: <Search size={18} />, label: 'Discover Projects', onClick: () => navigate('/investor/find-projects') },
+    { icon: <Users size={18} />, label: 'Join Room', onClick: () => navigate('/investor/room') },
+    { icon: <CreditCard size={18} />, label: 'Manage Wallet', onClick: () => navigate('/investor/payments') }
   ]
 
   return (
     <aside style={{ width: 260, padding: 16, background: '#DBEAFE' }}>
-      {/* Logo */}
       <div style={{ margin: '0 0 20px 4px' }}>
         <img src={logo} alt="Idea" style={{ width: 42, height: 42, borderRadius: 8 }} />
       </div>
 
-      {/* User Card */}
       <div style={{ ...card, padding: 16, marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {user?.profilePictureUrl ? (
@@ -113,15 +110,14 @@ const StartupSidebar: FC = () => {
             </div>
           )}
           <div>
-            <div style={{ color: '#0f172a', fontWeight: 700 }}>{user?.fullName || user?.email || 'User'}</div>
-            <div style={{ color: '#6b7280', fontSize: 13 }}>{user?.startupName || 'Startup'}</div>
+            <div style={{ color: '#0f172a', fontWeight: 700 }}>{user?.fullName || user?.email || 'Investor'}</div>
+            <div style={{ color: '#6b7280', fontSize: 13 }}>Investor Portal</div>
           </div>
         </div>
       </div>
 
-      {/* Menu */}
       <div style={{ marginBottom: 14, color: '#6b7280', fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>
-        STARTUP PORTAL
+        INVESTOR PORTAL
       </div>
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {menuItems.map(item => (
@@ -129,7 +125,6 @@ const StartupSidebar: FC = () => {
         ))}
       </nav>
 
-      {/* Quick Actions */}
       <div
         style={{
           marginTop: 18,
@@ -139,7 +134,6 @@ const StartupSidebar: FC = () => {
         }}
       >
         <div style={{ color: '#ffffff', fontWeight: 700, marginBottom: 12, fontSize: 20 }}>Quick Actions</div>
-
         <div style={{ display: 'grid', gap: 12 }}>
           {actions.map((action, i) => (
             <button key={i} onClick={action.onClick} style={buttonBase}>
@@ -152,4 +146,4 @@ const StartupSidebar: FC = () => {
   )
 }
 
-export default StartupSidebar
+export default InvestorSidebar

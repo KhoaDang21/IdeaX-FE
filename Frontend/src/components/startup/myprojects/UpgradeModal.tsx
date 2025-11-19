@@ -34,20 +34,20 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
 
   const handlePurchaseWallet = async (pkg: { id: number; price: number }) => {
     if (walletBalance < pkg.price) {
-      message.error("Số dư ví không đủ.");
+      message.error("Insufficient wallet balance.");
       return;
     }
     setPurchaseLoading((prev) => ({ ...prev, [pkg.id]: true }));
     try {
       await paymentService.purchaseWithWallet(pkg.id); //
-      message.success("Nâng cấp gói thành công!");
+      message.success("Package upgraded successfully!");
       // Refresh lại thông tin user (để cập nhật projectLimit mới)
       if (user?.id) {
         dispatch(getStartupProfile(user.id));
       }
       onClose();
     } catch (error: any) {
-      message.error(error.response?.data?.message || "Lỗi khi mua bằng ví");
+      message.error(error.response?.data?.message || "Error purchasing with wallet");
     } finally {
       setPurchaseLoading((prev) => ({ ...prev, [pkg.id]: false }));
     }
@@ -57,30 +57,29 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
     setPurchaseLoading((prev) => ({ ...prev, [packageId]: true }));
     try {
       const { paymentUrl } = await paymentService.createPackageOrder(packageId); //
-      message.loading("Đang chuyển hướng đến cổng thanh toán...", 1);
+      message.loading("Redirecting to payment gateway...", 1);
       setTimeout(() => {
         window.location.href = paymentUrl; // Chuyển hướng
       }, 1000);
     } catch (error: any) {
-      message.error(error.response?.data?.message || "Lỗi khi tạo đơn hàng");
+      message.error(error.response?.data?.message || "Error creating order");
       setPurchaseLoading((prev) => ({ ...prev, [packageId]: false }));
     }
   };
 
   return (
     <Modal
-      title="Nâng cấp Gói Project"
+      title="Upgrade Package"
       open={open}
       onCancel={onClose}
       footer={null}
       width={700}
     >
       <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
-        Bạn đã đạt giới hạn số lượng project. Vui lòng chọn một gói bên dưới để
-        tiếp tục.
+        You have reached the project limit. Please choose a package below to continue.
       </Text>
       <Text strong>
-        Số dư ví của bạn: {walletBalance.toLocaleString("vi-VN")} VNĐ
+        Wallet balance: {walletBalance.toLocaleString('en-US')} VND
       </Text>
 
       {loading && <InlineLoading />}
@@ -99,18 +98,18 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
                 disabled={walletBalance < pkg.price}
                 onClick={() => handlePurchaseWallet(pkg)}
               >
-                Mua bằng Ví
+                Buy with Wallet
               </Button>
               <Button
                 loading={purchaseLoading[pkg.id]}
                 onClick={() => handlePurchaseGateway(pkg.id)}
               >
-                Thanh toán (PayOS)
+                Pay (PayOS)
               </Button>
             </div>
             {walletBalance < pkg.price && (
               <Text type="danger" style={{ display: "block", marginTop: 8 }}>
-                Không đủ số dư ví. Vui lòng nạp thêm hoặc thanh toán qua PayOS.
+                Insufficient wallet balance. Please top up or pay via PayOS.
               </Text>
             )}
           </Card>

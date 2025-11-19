@@ -207,25 +207,25 @@ const InvestorsJoin: FC = () => {
       fullName: fullName.trim(),
     };
 
-    if (!trimmed.fullName) newErrors.fullName = "Vui lòng nhập họ tên";
-    if (!trimmed.email) newErrors.email = "Vui lòng nhập email";
+    if (!trimmed.fullName) newErrors.fullName = "Please enter your full name";
+    if (!trimmed.email) newErrors.email = "Please enter your email";
     else if (!validateEmail(trimmed.email))
-      newErrors.email = "Email không hợp lệ";
-    if (!password) newErrors.password = "Vui lòng nhập mật khẩu";
+      newErrors.email = "Invalid email address";
+    if (!password) newErrors.password = "Please enter a password";
     else if (!validatePassword(password)) {
       newErrors.password =
-        "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ HOA và 1 số";
+        "Password must be at least 8 characters long and include 1 uppercase letter and 1 number";
     }
     if (!confirmPassword)
-      newErrors.confirmPassword = "Vui lòng nhập xác nhận mật khẩu";
+      newErrors.confirmPassword = "Please confirm your password";
     else if (password !== confirmPassword)
-      newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
+      newErrors.confirmPassword = "Password confirmation does not match";
     if (
       investmentFocus &&
       investmentFocus === "OTHER" &&
       !customInvestmentFocus.trim()
     ) {
-      newErrors.customInvestmentFocus = "Vui lòng nhập ngành đầu tư cụ thể";
+      newErrors.customInvestmentFocus = "Please enter the specific investment focus";
     }
     // Validate các field optional nhưng vẫn báo nếu trống (nếu muốn bắt buộc)
     // if (!organization.trim()) newErrors.organization = 'Vui lòng nhập tổ chức';
@@ -235,12 +235,12 @@ const InvestorsJoin: FC = () => {
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
-      message.error("Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới");
+      message.error("Please check the information and fix the errors below");
       return;
     }
     setSubmitting(true);
     message.loading({
-      content: "Đang tạo tài khoản...",
+      content: "Creating account...",
       key: "register",
       duration: 0,
     });
@@ -265,7 +265,7 @@ const InvestorsJoin: FC = () => {
       };
       await (dispatch as any)(registerInvestor(payload)).unwrap();
       message.success({
-        content: "Tạo tài khoản thành công! Vui lòng đăng nhập.",
+        content: "Account created successfully! Please log in.",
         key: "register",
       });
       setTimeout(() => navigate("/login"), 1200);
@@ -288,12 +288,12 @@ const InvestorsJoin: FC = () => {
         setErrors((prev) => ({ ...prev, ...serverErrors }));
         // replace loading message with field error so spinner/toast stops
         message.error({
-          content: serverMsg || "Tạo tài khoản thất bại",
+          content: serverMsg || "Account creation failed",
           key: "register",
         });
       } else {
         message.error({
-          content: serverMsg || "Tạo tài khoản thất bại. Vui lòng thử lại.",
+          content: serverMsg || "Account creation failed. Please try again.",
           key: "register",
         });
       }
@@ -602,7 +602,7 @@ const InvestorsJoin: FC = () => {
                     marginTop: 6,
                   }}
                 >
-                  {submitting ? "Đang tạo..." : "Create Investor Account"}
+                  {submitting ? "Creating..." : "Create Investor Account"}
                 </button>
               </form>
             </div>

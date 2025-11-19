@@ -63,7 +63,7 @@ const Roommeet: React.FC = () => {
 
   const handleConfirm = async (meetingId: number) => {
     if (!authUser) {
-      message.error("Vui lòng đăng nhập");
+      message.error("Please log in");
       return;
     }
 
@@ -73,7 +73,7 @@ const Roommeet: React.FC = () => {
       // Refresh meetings for startup
       dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(() => { });
     } catch (err: any) {
-      message.error(err?.message || "Lỗi khi xác nhận meeting");
+      message.error(err?.message || "Error confirming meeting");
     }
   };
 
@@ -140,7 +140,7 @@ const Roommeet: React.FC = () => {
       });
     } catch (error) {
       console.error('Error loading meeting details:', error);
-      message.error('Lỗi khi tải thông tin meeting');
+      message.error('Error loading meeting details');
     } finally {
       setLoadingDetails(false);
     }
@@ -148,14 +148,14 @@ const Roommeet: React.FC = () => {
 
   const handleSignNDA = async (meetingId: number, meeting: any) => {
     if (!authUser) {
-      message.error("Vui lòng đăng nhập");
+      message.error("Please log in");
       return;
     }
 
     try {
       const templates = await dispatch(fetchNdaTemplates()).unwrap();
       if (!templates || templates.length === 0) {
-        message.error("Chưa có template NDA. Vui lòng liên hệ admin để upload template.");
+        message.error("No NDA template available. Please contact admin to upload.");
         return;
       }
 
@@ -200,7 +200,7 @@ const Roommeet: React.FC = () => {
         setNdaModalVisible(true);
       }
     } catch (err: any) {
-      message.error(err?.message || err.response?.data || "Lỗi khi tải template NDA");
+      message.error(err?.message || err.response?.data || "Error loading NDA template");
     }
   };
 
@@ -212,7 +212,7 @@ const Roommeet: React.FC = () => {
       return;
     }
     if (!ndaAgreeChecked) {
-      message.error("Vui lòng đồng ý điều khoản trước khi ký NDA");
+      message.error("Please agree to the terms before signing the NDA");
       return;
     }
 
@@ -223,7 +223,7 @@ const Roommeet: React.FC = () => {
       // 2) gọi meeting sign
       await dispatch(signMeetingNda({ meetingId: currentSigningMeeting, userId: Number(authUser.id) })).unwrap();
 
-      message.success("Ký NDA thành công!");
+      message.success("NDA signed successfully!");
       setNdaModalVisible(false);
       setSelectedTemplate(null);
       setCurrentSigningMeeting(null);
@@ -231,13 +231,13 @@ const Roommeet: React.FC = () => {
       setMeetingDetails(null);
       dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(() => { });
     } catch (err: any) {
-      message.error(err.response?.data || err?.message || "Lỗi khi ký NDA");
+      message.error(err.response?.data || err?.message || "Error signing NDA");
     }
   };
 
   const handleJoin = async (meetingId: number) => {
     if (!authUser) {
-      message.error("Vui lòng đăng nhập để tham gia meeting");
+      message.error("Please log in to join the meeting");
       return;
     }
 
@@ -249,20 +249,20 @@ const Roommeet: React.FC = () => {
         message.error("Không thể lấy link tham gia");
       }
     } catch (err: any) {
-      message.error(err.response?.data || err.message || "Lỗi khi lấy link tham gia");
+      message.error(err.response?.data || err.message || "Error retrieving join link");
     }
   };
 
   const getStatusTag = (status?: MeetingStatus) => {
     switch (status) {
       case "PENDING":
-        return <Tag color="orange">Chờ xác nhận</Tag>;
+        return <Tag color="orange">Pending Confirmation</Tag>;
       case "WAITING_NDA":
-        return <Tag color="blue">Chờ ký NDA</Tag>;
+        return <Tag color="blue">Waiting for NDA</Tag>;
       case "CONFIRMED":
-        return <Tag color="green">Đã xác nhận</Tag>;
+        return <Tag color="green">Confirmed</Tag>;
       default:
-        return <Tag>Không xác định</Tag>;
+        return <Tag>Unknown</Tag>;
     }
   };
 
@@ -334,11 +334,10 @@ const Roommeet: React.FC = () => {
               icon={<CheckOutlined />}
               onClick={() => handleConfirm(record.id)}
             >
-              Xác nhận
+              Confirm
             </Button>
           )}
           {(record.startupNdaSigned || (record.status === "WAITING_NDA" && record.startupStatus !== "CONFIRMED")) && (
-            // If startup already signed, show View NDA; otherwise show Sign NDA (when waiting NDA)
             record.startupNdaSigned ? (
               <Button
                 icon={<EditOutlined />}
@@ -351,23 +350,25 @@ const Roommeet: React.FC = () => {
                 icon={<EditOutlined />}
                 onClick={() => handleSignNDA(record.id, record)}
               >
-                Ký NDA
+                Sign NDA
               </Button>
             )
           )}
-          {record.status === "CONFIRMED" && (
-            <Button
-              type="primary"
-              icon={<VideoCameraOutlined />}
-              onClick={() => handleJoin(record.id)}
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                border: "none",
-              }}
-            >
-              Join Meeting
-            </Button>
-          )}
+          {/* Sửa phần Join button để đồng bộ với Investor */}
+          <Button
+            type="primary"
+            icon={<VideoCameraOutlined />}
+            onClick={() => handleJoin(record.id)}
+            disabled={record.status !== "CONFIRMED"}
+            style={{
+              background: record.status === "CONFIRMED"
+                ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                : "#d9d9d9",
+              border: "none",
+            }}
+          >
+            {record.status === "CONFIRMED" ? "Join Meeting" : "Unavailable"}
+          </Button>
         </Space>
       ),
     },
@@ -394,7 +395,7 @@ const Roommeet: React.FC = () => {
         {meetingsState.loading ? (
           <InlineLoading />
         ) : meetingsState.meetings.length === 0 ? (
-          <Empty description="Chưa có meeting nào" />
+          <Empty description="No meetings found" />
         ) : (
           <Table
             columns={columns}
@@ -406,25 +407,25 @@ const Roommeet: React.FC = () => {
       </Card>
 
       <Modal
-        title="Thông tin NDA & Meeting"
+        title="NDA & Meeting Information"
         open={ndaModalVisible}
         onOk={ndaMode === 'sign' ? confirmSignFromModal : handleModalClose}
         onCancel={handleModalClose}
         width={700}
-        okText={ndaMode === 'sign' ? "Ký NDA" : "Đóng"}
-        cancelText="Hủy"
+        okText={ndaMode === 'sign' ? "Sign NDA" : "Close"}
+        cancelText="Cancel"
         confirmLoading={ndaState.loading}
         okButtonProps={{ disabled: ndaMode === 'sign' ? (!ndaAgreeChecked || ndaState.loading) : false }}
       >
         {loadingDetails ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>
-            <InlineLoading message="Đang tải thông tin meeting..." />
+            <InlineLoading message="Loading meeting details..." />
           </div>
         ) : (
           <div style={{ minHeight: 120 }}>
             {/* Thông tin meeting */}
             <Descriptions
-              title="Thông tin Meeting"
+              title="Meeting Information"
               bordered
               column={1}
               size="small"
@@ -456,11 +457,11 @@ const Roommeet: React.FC = () => {
               marginBottom: 16
             }}>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                Nội dung Thỏa thuận Bảo mật (NDA):
+                NDA Content:
               </Text>
               <Text type="secondary">
                 {selectedTemplate?.description ||
-                  "Bằng việc ký NDA này, các bên cam kết bảo mật thông tin được chia sẻ trong meeting. Mọi thông tin trao đổi, tài liệu, ý tưởng và dữ liệu được xem là thông tin mật và không được tiết lộ cho bên thứ ba mà không có sự đồng ý bằng văn bản."}
+                  "By signing this NDA, both parties agree to keep confidential any information shared during the meeting. All communications, documents, ideas, and data are considered confidential and must not be disclosed to third parties without written consent."}
               </Text>
             </div>
 
@@ -474,16 +475,16 @@ const Roommeet: React.FC = () => {
                   disabled={ndaMode === 'view'}
                 />
                 <span>
-                  Tôi đã đọc, hiểu và đồng ý với tất cả các điều khoản trong Thỏa thuận Bảo mật (NDA) này. Tôi cam kết tuân thủ các quy định về bảo mật thông tin được nêu trong tài liệu.
+                  I have read, understand, and agree to all terms in this Non-Disclosure Agreement (NDA). I commit to complying with the confidentiality rules set forth in the document.
                 </span>
               </label>
 
               {/* Status helper text */}
               <div style={{ marginTop: 10 }}>
                 {currentMeetingRecord?.investorNdaSigned && currentMeetingRecord?.startupNdaSigned ? (
-                  <Text type="success">Cả 2 bên đã ký NDA và chấp nhận các điều khoản. Meeting đã được xác nhận. Bạn có thể tham gia phòng họp.</Text>
+                  <Text type="success">Both parties have signed the NDA and accepted the terms. The meeting is confirmed. You can join the meeting.</Text>
                 ) : (
-                  <Text type="warning">Đang chờ bên còn lại ký NDA.</Text>
+                  <Text type="warning">Waiting for the other party to sign the NDA.</Text>
                 )}
               </div>
             </div>

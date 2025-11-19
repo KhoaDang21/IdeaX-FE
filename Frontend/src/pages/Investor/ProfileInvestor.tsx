@@ -57,16 +57,16 @@ const ProfileInvestor: React.FC = () => {
         const errors: Record<string, string> = {}
 
         // Validate required fields
-        if (!form.fullName.trim()) errors.fullName = 'Họ tên không được để trống'
+        if (!form.fullName.trim()) errors.fullName = 'Full name is required'
 
         // Validate phone number (if provided)
         if (form.phoneNumber && !/^[\+]?[0-9\s\-\(\)]{10,}$/.test(form.phoneNumber)) {
-            errors.phoneNumber = 'Số điện thoại không hợp lệ'
+            errors.phoneNumber = 'Invalid phone number'
         }
 
         // Validate LinkedIn URL (if provided)
         if (form.linkedInUrl && !form.linkedInUrl.includes('linkedin.com')) {
-            errors.linkedInUrl = 'LinkedIn URL phải là URL hợp lệ'
+            errors.linkedInUrl = 'LinkedIn URL must be a valid URL'
         }
 
         return errors
@@ -106,7 +106,7 @@ const ProfileInvestor: React.FC = () => {
         const errors = validateForm()
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors)
-            message.error('Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới')
+            message.error('Please check the information and fix the errors below')
             return
         }
 
