@@ -5,6 +5,7 @@ import ndaReducer from "./services/features/nda/ndaSlice";
 import meetingReducer from "./services/features/meeting/meetingSlice";
 import paymentReducer from "./services/features/payment/paymentSlice";
 import packageReducer from './services/features/payment/packageSlice';
+import contractReducer from "./services/features/contract/contractSlice";
 
 const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ const store = configureStore({
     meeting: meetingReducer,
     payment: paymentReducer,
     package: packageReducer,
+    contract: contractReducer,
   },
 });
 

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { api } from "../../constant/axiosInstance";
+import type { ContractStatus } from "../../../types/contract";
 
 // ===== Types =====
 export type MeetingStatus = "PENDING" | "WAITING_NDA" | "CONFIRMED";
@@ -28,6 +29,16 @@ export interface Meeting {
   startupStatus?: MeetingStatus;
   investorNdaSigned?: boolean;
   startupNdaSigned?: boolean;
+  ndaCompleted?: boolean;
+  contractStatus?: ContractStatus;
+  investorContractSigned?: boolean;
+  startupContractSigned?: boolean;
+  contractInvestmentAmount?: number;
+  contractFundsReleased?: boolean;
+  contractPaymentId?: number;
+  projectMinimumInvestment?: number;
+  projectFundingAmount?: number;
+  projectFundingReceived?: number;
 }
 
 interface MeetingState {

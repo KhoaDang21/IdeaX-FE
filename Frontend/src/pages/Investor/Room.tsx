@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
-import { fetchMeetings, signMeetingNda, joinMeeting, type MeetingStatus } from "../../services/features/meeting/meetingSlice";
+import { fetchMeetings, signMeetingNda, joinMeeting, type MeetingStatus, type Meeting } from "../../services/features/meeting/meetingSlice";
 import { fetchNdaTemplates, signNda } from "../../services/features/nda/ndaSlice";
+import { fetchContractByMeeting, clearContract } from "../../services/features/contract/contractSlice";
 import { getAccountById } from "../../services/features/auth/accountService";
 import api from "../../services/constant/axiosInstance";
 import { getStartupProfile, getInvestorProfile } from "../../services/features/auth/authSlice";
@@ -22,6 +23,7 @@ import {
     Descriptions,
 } from "antd";
 import InlineLoading from '../../components/InlineLoading'
+import MeetingContractModal from "../../components/meeting/MeetingContractModal";
 import {
     VideoCameraOutlined,
     CalendarOutlined,
@@ -50,10 +52,40 @@ const Room: React.FC = () => {
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [ndaMode, setNdaMode] = useState<'sign' | 'view'>('sign');
     const [currentMeetingRecord, setCurrentMeetingRecord] = useState<any>(null);
+    const [contractModalVisible, setContractModalVisible] = useState(false);
+    const [contractMeeting, setContractMeeting] = useState<Meeting | null>(null);
 
     useEffect(() => {
         dispatch(fetchMeetings() as any).catch(() => { });
     }, [dispatch]);
+
+    const handleOpenContract = async (meeting: Meeting) => {
+        if (!authUser) {
+            message.error("Vui lòng đăng nhập để xem hợp đồng");
+            return;
+        }
+        if (!meeting.ndaCompleted) {
+            message.warning("Cần hoàn tất NDA của cả hai bên trước khi ký hợp đồng.");
+            return;
+        }
+        setContractMeeting(meeting);
+        setContractModalVisible(true);
+        try {
+            await dispatch(fetchContractByMeeting({
+                meetingId: meeting.id,
+                userId: authUser ? Number(authUser.id) : undefined
+            })).unwrap();
+        } catch (err: any) {
+            message.error(err?.message || err.response?.data || "Không thể tải hợp đồng");
+            setContractModalVisible(false);
+        }
+    };
+
+    const handleContractModalClose = () => {
+        setContractModalVisible(false);
+        setContractMeeting(null);
+        dispatch(clearContract());
+    };
 
     const handleJoin = async (meetingId: number) => {
         if (!authUser) {
@@ -252,19 +284,20 @@ const Room: React.FC = () => {
         <>
             <div
                 style={{
-                    padding: "24px 16px",
+                    padding: "16px 12px",
                     background: "linear-gradient(135deg, #f5f7fa 0%, #eaeef5 100%)",
                     minHeight: "100vh",
+                    margin: 0,
                 }}
             >
                 {/* Header Section */}
                 <div
                     style={{
                         background: "white",
-                        padding: "24px 28px",
+                        padding: "20px 24px",
                         borderRadius: 12,
                         boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                        marginBottom: 24,
+                        marginBottom: 20,
                     }}
                 >
                     <Row justify="space-between" align="middle">
@@ -483,7 +516,8 @@ const Room: React.FC = () => {
                                         style={{
                                             display: "flex",
                                             justifyContent: "space-between",
-                                            alignItems: "center",
+                                            alignItems: "stretch",
+                                            flexWrap: "wrap",
                                             gap: 10,
                                             marginTop: 14,
                                         }}
@@ -507,6 +541,76 @@ const Room: React.FC = () => {
                                             >
                                                 {m.investorNdaSigned ? "View NDA" : "Sign NDA"}
                                             </Button>
+                                        )}
+
+                                        {/* Nút hợp đồng - hiển thị khi NDA hoàn tất VÀ user là investor */}
+                                        {m.ndaCompleted && authUser?.role === "investor" && (
+                                            (() => {
+                                                const fully = m.contractStatus === "FULLY_SIGNED";
+                                                if (fully) {
+                                                    return (
+                                                        <Button
+                                                            icon={<FileTextOutlined />}
+                                                            onClick={() => handleOpenContract(m)}
+                                                            style={{ flex: 1, minWidth: 140, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 13.5 }}
+                                                        >
+                                                            View Contract
+                                                        </Button>
+                                                    );
+                                                }
+
+                                                // Investor can compose/send or view draft after sending
+                                                return (
+                                                    <Button
+                                                        icon={<FileTextOutlined />}
+                                                        onClick={() => handleOpenContract(m)}
+                                                        style={{ flex: 1, minWidth: 140, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 13.5 }}
+                                                    >
+                                                        {m.investorContractSigned ? "View Contract" : "Sign Contract"}
+                                                    </Button>
+                                                );
+                                            })()
+                                        )}
+
+                                        {/* Nút hợp đồng - hiển thị khi NDA hoàn tất VÀ user là startup */}
+                                        {m.ndaCompleted && authUser?.role === "startup" && (
+                                            (() => {
+                                                const fully = m.contractStatus === "FULLY_SIGNED";
+                                                if (fully) {
+                                                    return (
+                                                        <Button
+                                                            icon={<FileTextOutlined />}
+                                                            onClick={() => handleOpenContract(m)}
+                                                            style={{ flex: 1, minWidth: 140, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 13.5 }}
+                                                        >
+                                                            View Contract
+                                                        </Button>
+                                                    );
+                                                }
+
+                                                // Startup view
+                                                if (m.investorContractSigned && !m.startupContractSigned) {
+                                                    return (
+                                                        <Button
+                                                            icon={<FileTextOutlined />}
+                                                            onClick={() => handleOpenContract(m)}
+                                                            style={{ flex: 1, minWidth: 140, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 13.5 }}
+                                                        >
+                                                            Ký hợp đồng
+                                                        </Button>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <Button
+                                                        icon={<FileTextOutlined />}
+                                                        disabled
+                                                        style={{ flex: 1, minWidth: 140, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 13.5 }}
+                                                    >
+                                                        Chờ nhà đầu tư
+                                                    </Button>
+                                                );
+                                            })()
                                         )}
 
                                         {/* Nút join meeting */}
@@ -626,6 +730,15 @@ const Room: React.FC = () => {
                     </div>
                 )}
             </Modal>
+
+            <MeetingContractModal
+                open={contractModalVisible}
+                meeting={contractMeeting}
+                isInvestor={authUser?.role === "investor"}
+                userId={authUser ? Number(authUser.id) : undefined}
+                onCancel={handleContractModalClose}
+                onAfterAction={() => dispatch(fetchMeetings() as any)}
+            />
         </>
     );
 };
