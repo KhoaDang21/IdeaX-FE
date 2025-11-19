@@ -296,9 +296,9 @@ const StartupsJoin: FC = () => {
               src={logo}
               alt="IdeaX"
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
+                width: 48,
+                height: 48,
+                borderRadius: 12,
                 objectFit: "cover",
               }}
             />

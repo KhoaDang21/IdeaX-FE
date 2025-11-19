@@ -28,7 +28,7 @@ const Home: FC = () => {
             <header style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #eef2f7' }}>
                 <nav style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px' }}>
                     <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-                        <img src={logo} alt="IdeaX" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+                        <img src={logo} alt="IdeaX" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover' }} />
                         <span style={{ fontWeight: 700, color: '#0f172a' }}>IdeaX</span>
                     </Link>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
