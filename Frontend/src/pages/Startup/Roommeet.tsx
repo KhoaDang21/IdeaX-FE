@@ -7,8 +7,13 @@ import {
   signMeetingNda,
   joinMeeting,
   type MeetingStatus,
+  type Meeting,
 } from "../../services/features/meeting/meetingSlice";
 import { fetchNdaTemplates, signNda } from "../../services/features/nda/ndaSlice";
+import {
+  fetchContractByMeeting,
+  clearContract,
+} from "../../services/features/contract/contractSlice";
 import { getAccountById } from "../../services/features/auth/accountService";
 import api from "../../services/constant/axiosInstance";
 import { getStartupProfile, getInvestorProfile } from "../../services/features/auth/authSlice";
@@ -25,6 +30,7 @@ import {
   Descriptions,
 } from "antd";
 import InlineLoading from '../../components/InlineLoading'
+import MeetingContractModal from "../../components/meeting/MeetingContractModal";
 import {
   VideoCameraOutlined,
   EditOutlined,
@@ -33,6 +39,7 @@ import {
   UserOutlined,
   MailOutlined,
   ProjectOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -60,6 +67,8 @@ const Roommeet: React.FC = () => {
   const [ndaMode, setNdaMode] = useState<'sign' | 'view'>('sign');
   // Keep the raw meeting record used to determine per-meeting NDA flags
   const [currentMeetingRecord, setCurrentMeetingRecord] = useState<any>(null);
+  const [contractModalVisible, setContractModalVisible] = useState(false);
+  const [contractMeeting, setContractMeeting] = useState<Meeting | null>(null);
 
   const handleConfirm = async (meetingId: number) => {
     if (!authUser) {
@@ -253,6 +262,34 @@ const Roommeet: React.FC = () => {
     }
   };
 
+  const handleOpenContract = async (meeting: Meeting) => {
+    if (!authUser) {
+      message.error("Vui lòng đăng nhập để xem hợp đồng");
+      return;
+    }
+    if (!meeting.ndaCompleted) {
+      message.warning("Cần hoàn tất NDA của cả hai bên trước khi ký hợp đồng.");
+      return;
+    }
+    setContractMeeting(meeting);
+    setContractModalVisible(true);
+    try {
+      await dispatch(fetchContractByMeeting({
+        meetingId: meeting.id,
+        userId: authUser ? Number(authUser.id) : undefined
+      })).unwrap();
+    } catch (err: any) {
+      message.error(err?.message || err.response?.data || "Không thể tải hợp đồng");
+      setContractModalVisible(false);
+    }
+  };
+
+  const handleContractModalClose = () => {
+    setContractModalVisible(false);
+    setContractMeeting(null);
+    dispatch(clearContract());
+  };
+
   const getStatusTag = (status?: MeetingStatus) => {
     switch (status) {
       case "PENDING":
@@ -323,53 +360,68 @@ const Roommeet: React.FC = () => {
       key: "status",
       render: (status: MeetingStatus) => getStatusTag(status),
     },
-    {
+      {
       title: "Actions",
       key: "actions",
       render: (_: any, record: any) => (
-        <Space>
-          {record.status === "PENDING" && (
-            <Button
-              type="primary"
-              icon={<CheckOutlined />}
-              onClick={() => handleConfirm(record.id)}
-            >
-              Confirm
-            </Button>
-          )}
-          {(record.startupNdaSigned || (record.status === "WAITING_NDA" && record.startupStatus !== "CONFIRMED")) && (
-            record.startupNdaSigned ? (
-              <Button
-                icon={<EditOutlined />}
-                onClick={() => handleSignNDA(record.id, record)}
-              >
-                View NDA
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {/* NDA / Confirm slot */}
+          <div style={{ flex: 1, minWidth: 110 }}>
+            {record.status === "PENDING" ? (
+              <Button type="primary" icon={<CheckOutlined />} onClick={() => handleConfirm(record.id)} style={{ width: '100%' }}>
+                Confirm
               </Button>
             ) : (
               <Button
                 icon={<EditOutlined />}
                 onClick={() => handleSignNDA(record.id, record)}
+                style={{ width: '100%' }}
               >
-                Sign NDA
+                {record.startupNdaSigned ? 'View NDA' : 'Sign NDA'}
               </Button>
-            )
-          )}
-          {/* Sửa phần Join button để đồng bộ với Investor */}
-          <Button
-            type="primary"
-            icon={<VideoCameraOutlined />}
-            onClick={() => handleJoin(record.id)}
-            disabled={record.status !== "CONFIRMED"}
-            style={{
-              background: record.status === "CONFIRMED"
-                ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                : "#d9d9d9",
-              border: "none",
-            }}
-          >
-            {record.status === "CONFIRMED" ? "Join Meeting" : "Unavailable"}
-          </Button>
-        </Space>
+            )}
+          </div>
+
+          {/* Contract slot */}
+          <div style={{ flex: 1, minWidth: 140 }}>
+            {record.ndaCompleted ? (
+              record.contractStatus === "FULLY_SIGNED" ? (
+                <Button icon={<FileTextOutlined />} onClick={() => handleOpenContract(record)} style={{ width: '100%' }}>
+                  View Contract
+                </Button>
+              ) : record.investorContractSigned && !record.startupContractSigned ? (
+                <Button icon={<FileTextOutlined />} onClick={() => handleOpenContract(record)} style={{ width: '100%' }}>
+                  Ký hợp đồng
+                </Button>
+              ) : (
+                <Button icon={<FileTextOutlined />} disabled style={{ width: '100%' }}>
+                  Chờ nhà đầu tư
+                </Button>
+              )
+            ) : (
+              <Button icon={<FileTextOutlined />} disabled style={{ width: '100%' }}>
+                Contract
+              </Button>
+            )}
+          </div>
+
+          {/* Join slot */}
+          <div style={{ flex: 1, minWidth: 120 }}>
+            <Button
+              type="primary"
+              icon={<VideoCameraOutlined />}
+              onClick={() => handleJoin(record.id)}
+              disabled={record.status !== "CONFIRMED"}
+              style={{
+                width: '100%',
+                background: record.status === "CONFIRMED" ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" : "#d9d9d9",
+                border: 'none'
+              }}
+            >
+              {record.status === "CONFIRMED" ? "Join Meeting" : "Unavailable"}
+            </Button>
+          </div>
+        </div>
       ),
     },
   ];
@@ -491,6 +543,18 @@ const Roommeet: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      <MeetingContractModal
+        open={contractModalVisible}
+        meeting={contractMeeting}
+        isInvestor={false}
+        userId={authUser ? Number(authUser.id) : undefined}
+        onCancel={handleContractModalClose}
+        onAfterAction={() =>
+          authUser &&
+          dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any)
+        }
+      />
     </div>
   );
 };
