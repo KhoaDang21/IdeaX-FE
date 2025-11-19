@@ -1,12 +1,19 @@
 import { Outlet } from 'react-router-dom'
-import InvestorHeader from './InvestorHeader'
+import InvestorSidebar from './InvestorSidebar'
 
 const InvestorLayout = () => {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#ffffff' }}>
-            <header style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <InvestorHeader />
-            </header>
+        <div style={{ display: 'flex', minHeight: '100vh', background: '#ffffff' }}>
+            <aside
+                style={{
+                    width: 260,
+                    background: '#DBEAFE',
+                    display: 'flex',
+                    flexDirection: 'column'
+                }}
+            >
+                <InvestorSidebar />
+            </aside>
             <main style={{ flex: 1, padding: 16 }}>
                 <Outlet />
             </main>

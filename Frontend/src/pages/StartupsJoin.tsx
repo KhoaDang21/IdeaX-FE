@@ -155,15 +155,15 @@ const StartupsJoin: FC = () => {
   // Clear a specific field error when user types
   const onChangeField =
     (setter: (v: string) => void, field?: string) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (field)
-        setErrors((prev) => {
-          const copy = { ...prev };
-          delete (copy as any)[field];
-          return copy;
-        });
-      setter(e.target.value);
-    };
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (field)
+          setErrors((prev) => {
+            const copy = { ...prev };
+            delete (copy as any)[field];
+            return copy;
+          });
+        setter(e.target.value);
+      };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,49 +176,49 @@ const StartupsJoin: FC = () => {
     };
 
     // Validate required fields
-    if (!trimmed.fullName) newErrors.fullName = "Vui lòng nhập họ tên";
+    if (!trimmed.fullName) newErrors.fullName = "Please enter your full name";
     if (!trimmed.startupName)
-      newErrors.startupName = "Vui lòng nhập tên công ty";
-    if (!trimmed.email) newErrors.email = "Vui lòng nhập email";
+      newErrors.startupName = "Please enter your company name";
+    if (!trimmed.email) newErrors.email = "Please enter your email";
     else if (!validateEmail(trimmed.email))
-      newErrors.email = "Email không hợp lệ";
+      newErrors.email = "Invalid email address";
 
     // Validate optional fields
     if (trimmed.companyWebsite && !validateUrl(trimmed.companyWebsite)) {
       newErrors.companyWebsite =
-        "Website không hợp lệ (ví dụ: https://example.com)";
+        "Invalid website (e.g., https://example.com)";
     }
 
     // Validate password
-    if (!password) newErrors.password = "Vui lòng nhập mật khẩu";
+    if (!password) newErrors.password = "Please enter a password";
     else if (!validatePassword(password)) {
       newErrors.password =
-        "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ HOA và 1 số";
+        "Password must be at least 8 characters long and include 1 uppercase letter and 1 number";
     }
 
     // Validate confirm password
     if (!confirmPassword)
-      newErrors.confirmPassword = "Vui lòng nhập xác nhận mật khẩu";
+      newErrors.confirmPassword = "Please confirm your password";
     else if (password !== confirmPassword)
-      newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
+      newErrors.confirmPassword = "Password confirmation does not match";
 
     // Validate file upload
     if (companyLogo && !validateFile(companyLogo)) {
       if (companyLogo.size > 2 * 1024 * 1024) {
-        newErrors.companyLogo = "File logo không được vượt quá 2MB";
+        newErrors.companyLogo = "Logo file must not exceed 2MB";
       } else {
-        newErrors.companyLogo = "Chỉ chấp nhận file ảnh (JPG, PNG, GIF)";
+        newErrors.companyLogo = "Only image files (JPG, PNG, GIF) are accepted";
       }
     }
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
-      message.error("Vui lòng kiểm tra lại thông tin và sửa các lỗi bên dưới");
+      message.error("Please check the information and fix the errors below");
       return;
     }
     setSubmitting(true);
     message.loading({
-      content: "Đang tạo tài khoản...",
+      content: "Creating account...",
       key: "register",
       duration: 0,
     });
@@ -238,7 +238,7 @@ const StartupsJoin: FC = () => {
 
       await (dispatch as any)(registerStartup(formData)).unwrap();
       message.success({
-        content: "Tạo tài khoản thành công! Vui lòng đăng nhập.",
+        content: "Account created successfully! Please log in.",
         key: "register",
       });
       setTimeout(() => navigate("/login"), 1200);
@@ -257,12 +257,12 @@ const StartupsJoin: FC = () => {
       if (Object.keys(serverErrors).length) {
         setErrors((prev) => ({ ...prev, ...serverErrors }));
         message.error({
-          content: serverMsg || "Tạo tài khoản thất bại",
+          content: serverMsg || "Account creation failed",
           key: "register",
         });
       } else
         message.error({
-          content: serverMsg || "Tạo tài khoản thất bại. Vui lòng thử lại.",
+          content: serverMsg || "Account creation failed. Please try again.",
           key: "register",
         });
     } finally {
@@ -559,7 +559,7 @@ const StartupsJoin: FC = () => {
                     marginTop: 6,
                   }}
                 >
-                  {submitting ? "Đang tạo..." : "Create Startup Account"}
+                  {submitting ? "Creating..." : "Create Startup Account"}
                 </button>
               </form>
             </div>

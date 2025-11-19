@@ -1,6 +1,6 @@
 import React from 'react'
 
-const GlobalLoading: React.FC<{ message?: string }> = ({ message = 'Đang tải...' }) => {
+const GlobalLoading: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => {
     return (
         <div className="global-loading-overlay" aria-hidden>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>

@@ -272,7 +272,7 @@ const ProjectManagement: React.FC = () => {
           {record.status === "PAUSED" ? (
             <Popconfirm
               title="Resume this project?"
-              onConfirm={() => message.info("Chức năng đang phát triển!")}
+              onConfirm={() => message.info("Feature under development!")}
               okText="Yes"
               cancelText="No"
             >
@@ -285,7 +285,7 @@ const ProjectManagement: React.FC = () => {
             (record.status === "PUBLISHED" || record.status === "APPROVED") && (
               <Popconfirm
                 title="Pause this project?"
-                onConfirm={() => message.info("Chức năng đang phát triển!")}
+                onConfirm={() => message.info("Feature under development!")}
                 okText="Yes"
                 cancelText="No"
               >

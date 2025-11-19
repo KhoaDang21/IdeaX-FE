@@ -57,7 +57,7 @@ const StartupHeader: FC = () => {
     }
 
     const handleLogout = () => {
-        message.success({ content: 'Đăng xuất thành công', key: 'logout', duration: 1.2 })
+        message.success({ content: 'Logged out successfully', key: 'logout', duration: 1.2 })
         dispatch(logout())
         setTimeout(() => {
             navigate('/login')
