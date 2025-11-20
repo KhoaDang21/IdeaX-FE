@@ -26,7 +26,6 @@ import {
   fetchContractByMeeting,
 } from "../../services/features/contract/contractSlice";
 import type { RootState, AppDispatch } from "../../store";
-import { api } from "../../services/constant/axiosInstance";
 import ContractPreviewOverlay from "./contract/ContractPreviewOverlay";
 import SignatureCard from "./contract/SignatureCard";
 
@@ -62,7 +61,6 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
   );
   const [form] = Form.useForm<ContractSignPayload>();
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -91,31 +89,9 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
       acceptTerms: false,
     };
     form.setFieldsValue(defaults);
-    if (isInvestor) {
-      (async () => {
-        try {
-          const res = await api.get(`/api/payments/wallet/me`);
-          const bal = Number(res.data?.balance || 0);
-          setWalletBalance(isNaN(bal) ? 0 : bal);
-        } catch {
-          setWalletBalance(null);
-        }
-      })();
-    }
-  }, [
-    open,
-    contract?.investmentAmount,
-    contract?.equitySharePercent,
-    contract?.investmentDurationMonths,
-    contract?.milestone,
-    meeting?.projectName,
-    meeting?.projectMinimumInvestment,
-    preview?.investmentAmount,
-    preview?.equitySharePercent,
-    preview?.investmentDurationMonths,
-    preview?.milestone,
-    form,
-  ]);
+    // wallet balance fetch removed — UI no longer displays wallet balance here
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isInvestor]);
 
   const displayedContract = preview ?? contract;
   const currentStatus = displayedContract?.status ?? "NOT_READY";
@@ -126,10 +102,8 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
   const investorFlowReady = isInvestor && ndaCompleted && !investorSigned;
   const startupFlowReady = !isInvestor && ndaCompleted && investorSigned && !startupSigned;
 
-  const fundingAmount = meeting?.projectFundingAmount ?? displayedContract?.projectFundingAmount ?? 0;
-  const fundingReceived = meeting?.projectFundingReceived ?? displayedContract?.projectFundingReceived ?? 0;
-  const remainingFunding = Math.max(0, Number(fundingAmount || 0) - Number(fundingReceived || 0));
-  const minimumInvestment = meeting?.projectMinimumInvestment ?? displayedContract?.projectMinimumInvestment ?? 0;
+
+
   const hideStatusForStartup = !isInvestor && currentStatus === "WAITING_STARTUP_SIGNATURE";
 
   const contractHtml =
@@ -156,12 +130,13 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
       return;
     }
     try {
+      // Use AntD form validation so fields show red error states
       const values = await form.validateFields([
         "investmentAmount",
         "equitySharePercent",
         "investmentDurationMonths",
-        "milestone",
       ]);
+
       await dispatch(
         previewContract({
           meetingId: meeting.id,
@@ -172,9 +147,12 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
       message.success("Đã tạo bản nháp hợp đồng với chữ ký nhà đầu tư.");
       setPreviewModalOpen(true);
     } catch (err: any) {
-      if (!err?.errorFields) {
-        message.error(err?.message || "Không thể tạo bản nháp.");
+      // If validation error, AntD will display field errors. For others, show generic.
+      if (err?.errorFields) {
+        // validation error - do nothing else (fields will show)
+        return;
       }
+      message.error(err?.message || "Không thể tạo bản nháp.");
     }
   };
 
@@ -384,70 +362,38 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
             <Divider />
 
             <Form layout="vertical" form={form}>
-          {isInvestor && (
-            <>
-              <Form.Item
-                name="investmentAmount"
-                label="Số tiền đầu tư (VND)"
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      const raw = value;
-                      const num = Number(raw || 0);
-                      if (walletBalance !== null && walletBalance <= 0) {
-                        return Promise.reject(new Error("Tài khoản không có tiền trong ví."));
+              {isInvestor && (
+                <>
+                  <Form.Item
+                    name="investmentAmount"
+                    label="Số tiền đầu tư (VND)"
+                    rules={[
+                      { required: true, message: "Vui lòng nhập số tiền đầu tư" },
+                      {
+                        validator: (_, value) =>
+                          value && Number(value) > 0
+                            ? Promise.resolve()
+                            : Promise.reject(new Error("Số tiền đầu tư phải lớn hơn 0")),
+                      },
+                    ]}
+                  >
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      min={1}
+                      step={1000000}
+                      formatter={(value) =>
+                        `${value ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                       }
-                      if ((raw === undefined || raw === null || raw === "") && investorFlowReady) {
-                        return Promise.reject(new Error("Vui lòng nhập số tiền đầu tư"));
-                      }
-                      if (!/^\d+$/.test(String(raw ?? ""))) {
-                        return Promise.reject(new Error("Chỉ được nhập số"));
-                      }
-                      if (walletBalance !== null && num > walletBalance) {
-                        return Promise.reject(new Error("Số dư ví không đủ."));
-                      }
-                      if (remainingFunding <= 0) {
-                        return Promise.reject(new Error("Dự án đã đạt đủ mục tiêu gọi vốn, không thể đầu tư thêm."));
-                      }
-                      if (num < Number(minimumInvestment || 0)) {
-                        return Promise.reject(new Error(`Ít nhất ${Number(minimumInvestment || 0).toLocaleString("vi-VN")} VND`));
-                      }
-                      if (num > remainingFunding) {
-                        return Promise.reject(new Error(`Tối đa ${remainingFunding.toLocaleString("vi-VN")} VND`));
-                      }
-                      return Promise.resolve();
-                    },
-                  },
-                ]}
-              >
-                <InputNumber
-                  min={meeting?.projectMinimumInvestment || 0}
-                  max={remainingFunding > 0 ? remainingFunding : undefined}
-                  style={{ width: "100%" }}
-                  step={1000000}
-                  formatter={(value) =>
-                    `${value ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                  }
-                  parser={(value) => value?.replace(/\$\s?|(,*)/g, "") as any}
-                />
-                <div style={{ marginTop: 6 }}>
-                  <Text type="secondary">
-                    Khoảng hợp lệ: tối thiểu {Number(minimumInvestment || 0).toLocaleString("vi-VN")} VND,
-                    tối đa {remainingFunding.toLocaleString("vi-VN")} VND.
-                    {walletBalance !== null && ` — Số dư ví: ${Number(walletBalance || 0).toLocaleString("vi-VN")} VND.`}
-                  </Text>
-                </div>
-              </Form.Item>
+                      parser={(value) => value?.replace(/\$\s?|(,*)/g, "") as any}
+                    />
+                  </Form.Item>
                   <Form.Item
                     name="equitySharePercent"
                     label="Tỷ lệ cổ phần (%)"
                     rules={[
+                      { required: true, message: "Vui lòng nhập tỷ lệ cổ phần" },
                       {
-                        required: investorFlowReady,
-                        message: "Vui lòng nhập tỷ lệ cổ phần",
-                      },
-                      {
-                        pattern: /^\d+(\.\d+)?$/,
+                        pattern: /^\d+(?:\.\d+)?$/,
                         message: "Chỉ được nhập số",
                       },
                     ]}
@@ -463,14 +409,8 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
                     name="investmentDurationMonths"
                     label="Thời hạn giải ngân (tháng)"
                     rules={[
-                      {
-                        required: investorFlowReady,
-                        message: "Vui lòng nhập thời hạn giải ngân",
-                      },
-                      {
-                        pattern: /^\d+$/,
-                        message: "Chỉ được nhập số",
-                      },
+                      { required: true, message: "Vui lòng nhập thời hạn giải ngân" },
+                      { pattern: /^\d+$/, message: "Chỉ được nhập số" },
                     ]}
                   >
                     <InputNumber
@@ -486,35 +426,30 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
                 <Input.TextArea rows={4} readOnly={!investorFlowReady} />
               </Form.Item>
 
-          {(investorFlowReady || startupFlowReady) && (
-            <Form.Item
-              name="acceptTerms"
-              valuePropName="checked"
-              rules={[
-                {
-                  validator: (_, value) =>
-                    value
-                      ? Promise.resolve()
-                      : Promise.reject(new Error("Bạn cần đồng ý với điều khoản trước khi ký")),
-                },
-              ]}
-              style={{ textAlign: "left" }}
-            >
-              <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <Checkbox onChange={(e) => setAcceptTermsChecked(e.target.checked)}>
-                  Tôi đã đọc toàn bộ hợp đồng và đồng ý với các điều khoản trên.
-                </Checkbox>
-              </div>
-            </Form.Item>
-          )}
+              {(investorFlowReady || startupFlowReady) && (
+                <Form.Item
+                  name="acceptTerms"
+                  valuePropName="checked"
+                  rules={[
+                    {
+                      validator: (_, value) =>
+                        value
+                          ? Promise.resolve()
+                          : Promise.reject(new Error("Bạn cần đồng ý với điều khoản trước khi ký")),
+                    },
+                  ]}
+                  style={{ textAlign: "left" }}
+                >
+                  <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                    <Checkbox onChange={(e) => setAcceptTermsChecked(e.target.checked)}>
+                      Tôi đã đọc toàn bộ hợp đồng và đồng ý với các điều khoản trên.
+                    </Checkbox>
+                  </div>
+                </Form.Item>
+              )}
             </Form>
 
             {/* Phần hiển thị chữ ký trong form hợp đồng */}
-            {/* Logic: 
-                - Khi chưa gửi (investor chưa ký): chỉ hiển thị chữ ký investor (cho investor xem)
-                - Khi investor đã gửi và startup chưa ký: startup thấy chữ ký investor
-                - Khi cả 2 đã ký: hiển thị cả 2 chữ ký
-            */}
             {((isInvestor && !investorSigned) || (!isInvestor && investorSigned) || (investorSigned && startupSigned)) && (
               <div style={{ marginTop: 16, borderTop: "1px solid #d9d9d9", padding: "20px 0" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
