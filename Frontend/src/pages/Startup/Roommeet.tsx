@@ -9,14 +9,20 @@ import {
   type MeetingStatus,
   type Meeting,
 } from "../../services/features/meeting/meetingSlice";
-import { fetchNdaTemplates, signNda } from "../../services/features/nda/ndaSlice";
+import {
+  fetchNdaTemplates,
+  signNda,
+} from "../../services/features/nda/ndaSlice";
 import {
   fetchContractByMeeting,
   clearContract,
 } from "../../services/features/contract/contractSlice";
 import { getAccountById } from "../../services/features/auth/accountService";
 import api from "../../services/constant/axiosInstance";
-import { getStartupProfile, getInvestorProfile } from "../../services/features/auth/authSlice";
+import {
+  getStartupProfile,
+  getInvestorProfile,
+} from "../../services/features/auth/authSlice";
 import {
   Table,
   Button,
@@ -28,8 +34,10 @@ import {
   Card,
   Modal,
   Descriptions,
+  Radio, // <-- NEW
+  type RadioChangeEvent, // <-- NEW
 } from "antd";
-import InlineLoading from '../../components/InlineLoading'
+import InlineLoading from "../../components/InlineLoading";
 import MeetingContractModal from "../../components/meeting/MeetingContractModal";
 import {
   VideoCameraOutlined,
@@ -40,6 +48,8 @@ import {
   MailOutlined,
   ProjectOutlined,
   FileTextOutlined,
+  WalletOutlined, // <-- NEW
+  CreditCardOutlined, // <-- NEW
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -50,25 +60,135 @@ const Roommeet: React.FC = () => {
   const ndaState = useSelector((s: RootState) => s.nda);
   const authUser = useSelector((s: RootState) => s.auth.user);
 
-  // For startup role: fetch meetings by startup id (backend provides this endpoint)
+  // For startup role: fetch meetings by startup id
   useEffect(() => {
     if (authUser?.id) {
-      dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(() => { });
+      dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(
+        () => {}
+      );
     }
   }, [dispatch, authUser]);
 
   const [ndaModalVisible, setNdaModalVisible] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null);
-  const [currentSigningMeeting, setCurrentSigningMeeting] = useState<number | null>(null);
+  const [currentSigningMeeting, setCurrentSigningMeeting] = useState<
+    number | null
+  >(null);
   const [ndaAgreeChecked, setNdaAgreeChecked] = useState(false);
   const [meetingDetails, setMeetingDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  // Mode for NDA modal: 'sign' => allow signing; 'view' => readonly view of NDA
-  const [ndaMode, setNdaMode] = useState<'sign' | 'view'>('sign');
-  // Keep the raw meeting record used to determine per-meeting NDA flags
+  const [ndaMode, setNdaMode] = useState<"sign" | "view">("sign");
   const [currentMeetingRecord, setCurrentMeetingRecord] = useState<any>(null);
   const [contractModalVisible, setContractModalVisible] = useState(false);
   const [contractMeeting, setContractMeeting] = useState<Meeting | null>(null);
+
+  // --- PAYMENT STATES ---
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"WALLET" | "PAYOS">(
+    "WALLET"
+  );
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  // --- LOGIC THANH TOÁN ---
+
+  const executeSignNdaLogic = async (
+    meetingIdParam?: number,
+    templateIdParam?: number,
+    userIdParam?: number
+  ) => {
+    const mId = meetingIdParam || currentSigningMeeting;
+    const tId = templateIdParam || selectedTemplate?.id;
+    const uId = userIdParam || (authUser ? Number(authUser.id) : null);
+
+    if (!mId || !tId || !uId) return;
+
+    try {
+      await dispatch(signNda({ userId: uId, ndaTemplateId: tId })).unwrap();
+      await dispatch(signMeetingNda({ meetingId: mId, userId: uId })).unwrap();
+
+      message.success("Thanh toán và Ký NDA thành công!");
+
+      setPaymentModalVisible(false);
+      setSelectedTemplate(null);
+      setCurrentSigningMeeting(null);
+      setNdaAgreeChecked(false);
+      setMeetingDetails(null);
+
+      if (authUser?.id) {
+        dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(
+          () => {}
+        );
+      }
+    } catch (err: any) {
+      console.error(err);
+      message.error("Đã thanh toán nhưng lỗi khi ký. Vui lòng liên hệ Admin.");
+    }
+  };
+
+  const handlePaymentAndSign = async () => {
+    setProcessingPayment(true);
+    try {
+      if (paymentMethod === "WALLET") {
+        await api.post("/api/payments/nda/pay-wallet", {
+          meetingId: currentSigningMeeting,
+        });
+        message.success("Đã trừ 150,000 VND từ ví.");
+        await executeSignNdaLogic();
+      } else {
+        const res = await api.post("/api/payments/nda/create-payos", {
+          meetingId: currentSigningMeeting,
+        });
+
+        if (res.data && res.data.paymentUrl) {
+          localStorage.setItem(
+            "pending_nda_sign_startup",
+            JSON.stringify({
+              meetingId: currentSigningMeeting,
+              templateId: selectedTemplate?.id,
+              userId: authUser?.id,
+            })
+          );
+          window.location.href = res.data.paymentUrl;
+        }
+      }
+    } catch (err: any) {
+      message.error(
+        err.response?.data || "Thanh toán thất bại. Kiểm tra số dư ví."
+      );
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  useEffect(() => {
+    const checkPayOsReturn = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const ndaMeetingId = urlParams.get("nda_meeting_id");
+      const pendingDataStr = localStorage.getItem("pending_nda_sign_startup");
+
+      if (ndaMeetingId && pendingDataStr) {
+        const pendingData = JSON.parse(pendingDataStr);
+        if (Number(ndaMeetingId) === pendingData.meetingId) {
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+          message.loading("Đang xác nhận thanh toán...", 1.5);
+          await executeSignNdaLogic(
+            pendingData.meetingId,
+            pendingData.templateId,
+            pendingData.userId
+          );
+        }
+        localStorage.removeItem("pending_nda_sign_startup");
+      }
+    };
+    checkPayOsReturn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch]);
+
+  // --- END LOGIC THANH TOÁN ---
 
   const handleConfirm = async (meetingId: number) => {
     if (!authUser) {
@@ -77,10 +197,13 @@ const Roommeet: React.FC = () => {
     }
 
     try {
-      await dispatch(confirmMeeting({ meetingId, startupId: Number(authUser.id) })).unwrap();
+      await dispatch(
+        confirmMeeting({ meetingId, startupId: Number(authUser.id) })
+      ).unwrap();
       message.success("Xác nhận meeting thành công!");
-      // Refresh meetings for startup
-      dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(() => { });
+      dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(
+        () => {}
+      );
     } catch (err: any) {
       message.error(err?.message || "Error confirming meeting");
     }
@@ -91,65 +214,71 @@ const Roommeet: React.FC = () => {
 
     setLoadingDetails(true);
     try {
-      // Prefer meeting-provided fields populated by backend (no admin required)
-      const investorFullNameFromMeeting = meeting.investorFullName || meeting.createdByName;
-      const investorEmailFromMeeting = meeting.investorEmail || meeting.createdByEmail;
-      const startupFullNameFromMeeting = meeting.startupFullName || meeting.startupName;
+      const investorFullNameFromMeeting =
+        meeting.investorFullName || meeting.createdByName;
+      const investorEmailFromMeeting =
+        meeting.investorEmail || meeting.createdByEmail;
+      const startupFullNameFromMeeting =
+        meeting.startupFullName || meeting.startupName;
       const startupEmailFromMeeting = meeting.startupEmail;
 
-      let investorFullName = investorFullNameFromMeeting || 'N/A';
-      let investorEmail = investorEmailFromMeeting || 'N/A';
-      let startupFullName = startupFullNameFromMeeting || 'N/A';
-      let startupEmail = startupEmailFromMeeting || 'N/A';
+      let investorFullName = investorFullNameFromMeeting || "N/A";
+      let investorEmail = investorEmailFromMeeting || "N/A";
+      let startupFullName = startupFullNameFromMeeting || "N/A";
+      let startupEmail = startupEmailFromMeeting || "N/A";
 
-      // If some info is still missing, try legacy endpoints as a fallback (may require proper permissions)
-      if ((!investorEmail || investorEmail === 'N/A') && meeting.createdById) {
+      if ((!investorEmail || investorEmail === "N/A") && meeting.createdById) {
         try {
-          const investorAccount = await getAccountById(meeting.createdById.toString());
+          const investorAccount = await getAccountById(
+            meeting.createdById.toString()
+          );
           investorEmail = investorAccount.email || investorEmail;
-        } catch (error) {
-          // ignore — will show N/A
-        }
+        } catch (error) {}
       }
 
-      if ((startupEmail === 'N/A' || !startupEmail) && meeting.startupId) {
+      if ((startupEmail === "N/A" || !startupEmail) && meeting.startupId) {
         try {
-          const startupAccount = await getAccountById(meeting.startupId.toString());
+          const startupAccount = await getAccountById(
+            meeting.startupId.toString()
+          );
           startupEmail = startupAccount.email || startupEmail;
-        } catch (error) {
-          // ignore
-        }
+        } catch (error) {}
       }
 
-      // If full names still missing, try profile endpoints as last resort
-      if ((investorFullName === 'N/A' || !investorFullName) && meeting.createdById) {
+      if (
+        (investorFullName === "N/A" || !investorFullName) &&
+        meeting.createdById
+      ) {
         try {
-          const investorProfile = await dispatch(getInvestorProfile(meeting.createdById.toString())).unwrap();
+          const investorProfile = await dispatch(
+            getInvestorProfile(meeting.createdById.toString())
+          ).unwrap();
           investorFullName = investorProfile.fullName || investorFullName;
-        } catch (error) {
-          // ignore
-        }
+        } catch (error) {}
       }
 
-      if ((startupFullName === 'N/A' || !startupFullName) && meeting.startupId) {
+      if (
+        (startupFullName === "N/A" || !startupFullName) &&
+        meeting.startupId
+      ) {
         try {
-          const startupProfile = await dispatch(getStartupProfile(meeting.startupId.toString())).unwrap();
+          const startupProfile = await dispatch(
+            getStartupProfile(meeting.startupId.toString())
+          ).unwrap();
           startupFullName = startupProfile.fullName || startupFullName;
-        } catch (error) {
-          // ignore
-        }
+        } catch (error) {}
       }
 
       setMeetingDetails({
-        projectName: meeting.projectName || 'N/A',
+        projectName: meeting.projectName || "N/A",
         startupFullName,
         startupEmail,
         investorFullName,
-        investorEmail
+        investorEmail,
       });
     } catch (error) {
-      console.error('Error loading meeting details:', error);
-      message.error('Error loading meeting details');
+      console.error("Error loading meeting details:", error);
+      message.error("Error loading meeting details");
     } finally {
       setLoadingDetails(false);
     }
@@ -164,7 +293,9 @@ const Roommeet: React.FC = () => {
     try {
       const templates = await dispatch(fetchNdaTemplates()).unwrap();
       if (!templates || templates.length === 0) {
-        message.error("No NDA template available. Please contact admin to upload.");
+        message.error(
+          "No NDA template available. Please contact admin to upload."
+        );
         return;
       }
 
@@ -172,51 +303,48 @@ const Roommeet: React.FC = () => {
       setSelectedTemplate(latest);
       setCurrentSigningMeeting(meetingId);
 
-      // Fetch fresh meeting record from backend to ensure flags are up-to-date
       try {
         const res = await api.get(`/api/meetings/${meetingId}`);
         const freshMeeting = res.data;
         setCurrentMeetingRecord(freshMeeting);
         const startupSigned = !!freshMeeting.startupNdaSigned;
-        const bothSigned = !!freshMeeting.startupNdaSigned && !!freshMeeting.investorNdaSigned;
+        const bothSigned =
+          !!freshMeeting.startupNdaSigned && !!freshMeeting.investorNdaSigned;
         if (bothSigned) {
-          setNdaMode('view');
+          setNdaMode("view");
           setNdaAgreeChecked(true);
         } else if (startupSigned) {
-          // startup already signed, show view but note waiting for other
-          setNdaMode('view');
+          setNdaMode("view");
           setNdaAgreeChecked(true);
         } else {
-          setNdaMode('sign');
+          setNdaMode("sign");
           setNdaAgreeChecked(false);
         }
-
-        // Load meeting details before showing modal
         await loadMeetingDetails(freshMeeting);
         setNdaModalVisible(true);
       } catch (err) {
-        // fallback to provided meeting object
         setCurrentMeetingRecord(meeting);
         const startupSigned = !!meeting.startupNdaSigned;
         if (startupSigned) {
-          setNdaMode('view');
+          setNdaMode("view");
           setNdaAgreeChecked(true);
         } else {
-          setNdaMode('sign');
+          setNdaMode("sign");
           setNdaAgreeChecked(false);
         }
         await loadMeetingDetails(meeting);
         setNdaModalVisible(true);
       }
     } catch (err: any) {
-      message.error(err?.message || err.response?.data || "Error loading NDA template");
+      message.error(
+        err?.message || err.response?.data || "Error loading NDA template"
+      );
     }
   };
 
   const confirmSignFromModal = async () => {
     if (!currentSigningMeeting || !authUser || !selectedTemplate) return;
-    // If in view mode, just close
-    if (ndaMode === 'view') {
+    if (ndaMode === "view") {
       handleModalClose();
       return;
     }
@@ -225,23 +353,9 @@ const Roommeet: React.FC = () => {
       return;
     }
 
-    try {
-      // 1) đảm bảo NdaAgreement tồn tại
-      await dispatch(signNda({ userId: Number(authUser.id), ndaTemplateId: selectedTemplate.id })).unwrap();
-
-      // 2) gọi meeting sign
-      await dispatch(signMeetingNda({ meetingId: currentSigningMeeting, userId: Number(authUser.id) })).unwrap();
-
-      message.success("NDA signed successfully!");
-      setNdaModalVisible(false);
-      setSelectedTemplate(null);
-      setCurrentSigningMeeting(null);
-      setNdaAgreeChecked(false);
-      setMeetingDetails(null);
-      dispatch(fetchMeetingsByStartup(Number(authUser.id)) as any).catch(() => { });
-    } catch (err: any) {
-      message.error(err.response?.data || err?.message || "Error signing NDA");
-    }
+    // --- CHUYỂN HƯỚNG SANG PAYMENT ---
+    setNdaModalVisible(false);
+    setPaymentModalVisible(true);
   };
 
   const handleJoin = async (meetingId: number) => {
@@ -251,14 +365,18 @@ const Roommeet: React.FC = () => {
     }
 
     try {
-      const url = await dispatch(joinMeeting({ meetingId, userId: Number(authUser.id) })).unwrap();
+      const url = await dispatch(
+        joinMeeting({ meetingId, userId: Number(authUser.id) })
+      ).unwrap();
       if (url) {
         window.open(url, "_blank");
       } else {
         message.error("Không thể lấy link tham gia");
       }
     } catch (err: any) {
-      message.error(err.response?.data || err.message || "Error retrieving join link");
+      message.error(
+        err.response?.data || err.message || "Error retrieving join link"
+      );
     }
   };
 
@@ -274,12 +392,16 @@ const Roommeet: React.FC = () => {
     setContractMeeting(meeting);
     setContractModalVisible(true);
     try {
-      await dispatch(fetchContractByMeeting({
-        meetingId: meeting.id,
-        userId: authUser ? Number(authUser.id) : undefined
-      })).unwrap();
+      await dispatch(
+        fetchContractByMeeting({
+          meetingId: meeting.id,
+          userId: authUser ? Number(authUser.id) : undefined,
+        })
+      ).unwrap();
     } catch (err: any) {
-      message.error(err?.message || err.response?.data || "Không thể tải hợp đồng");
+      message.error(
+        err?.message || err.response?.data || "Không thể tải hợp đồng"
+      );
       setContractModalVisible(false);
     }
   };
@@ -360,52 +482,71 @@ const Roommeet: React.FC = () => {
       key: "status",
       render: (status: MeetingStatus) => getStatusTag(status),
     },
-      {
+    {
       title: "Actions",
       key: "actions",
       render: (_: any, record: any) => (
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {/* NDA / Confirm slot */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div style={{ flex: 1, minWidth: 110 }}>
             {record.status === "PENDING" ? (
-              <Button type="primary" icon={<CheckOutlined />} onClick={() => handleConfirm(record.id)} style={{ width: '100%' }}>
+              <Button
+                type="primary"
+                icon={<CheckOutlined />}
+                onClick={() => handleConfirm(record.id)}
+                style={{ width: "100%" }}
+              >
                 Confirm
               </Button>
             ) : (
               <Button
                 icon={<EditOutlined />}
                 onClick={() => handleSignNDA(record.id, record)}
-                style={{ width: '100%' }}
+                style={{ width: "100%" }}
               >
-                {record.startupNdaSigned ? 'View NDA' : 'Sign NDA'}
+                {record.startupNdaSigned ? "View NDA" : "Sign NDA"}
               </Button>
             )}
           </div>
 
-          {/* Contract slot */}
           <div style={{ flex: 1, minWidth: 140 }}>
             {record.ndaCompleted ? (
               record.contractStatus === "FULLY_SIGNED" ? (
-                <Button icon={<FileTextOutlined />} onClick={() => handleOpenContract(record)} style={{ width: '100%' }}>
+                <Button
+                  icon={<FileTextOutlined />}
+                  onClick={() => handleOpenContract(record)}
+                  style={{ width: "100%" }}
+                >
                   View Contract
                 </Button>
-              ) : record.investorContractSigned && !record.startupContractSigned ? (
-                <Button icon={<FileTextOutlined />} onClick={() => handleOpenContract(record)} style={{ width: '100%' }}>
+              ) : record.investorContractSigned &&
+                !record.startupContractSigned ? (
+                <Button
+                  icon={<FileTextOutlined />}
+                  onClick={() => handleOpenContract(record)}
+                  style={{ width: "100%" }}
+                >
                   Ký hợp đồng
                 </Button>
               ) : (
-                <Button icon={<FileTextOutlined />} disabled style={{ width: '100%' }}>
+                <Button
+                  icon={<FileTextOutlined />}
+                  disabled
+                  style={{ width: "100%" }}
+                >
                   Chờ nhà đầu tư
                 </Button>
               )
             ) : (
-              <Button icon={<FileTextOutlined />} disabled style={{ width: '100%' }}>
+              <Button
+                icon={<FileTextOutlined />}
+                disabled
+                style={{ width: "100%" }}
+              >
                 Contract
               </Button>
             )}
           </div>
 
-          {/* Join slot */}
           <div style={{ flex: 1, minWidth: 120 }}>
             <Button
               type="primary"
@@ -413,9 +554,12 @@ const Roommeet: React.FC = () => {
               onClick={() => handleJoin(record.id)}
               disabled={record.status !== "CONFIRMED"}
               style={{
-                width: '100%',
-                background: record.status === "CONFIRMED" ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" : "#d9d9d9",
-                border: 'none'
+                width: "100%",
+                background:
+                  record.status === "CONFIRMED"
+                    ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                    : "#d9d9d9",
+                border: "none",
               }}
             >
               {record.status === "CONFIRMED" ? "Join Meeting" : "Unavailable"}
@@ -461,21 +605,23 @@ const Roommeet: React.FC = () => {
       <Modal
         title="NDA & Meeting Information"
         open={ndaModalVisible}
-        onOk={ndaMode === 'sign' ? confirmSignFromModal : handleModalClose}
+        onOk={ndaMode === "sign" ? confirmSignFromModal : handleModalClose}
         onCancel={handleModalClose}
         width={700}
-        okText={ndaMode === 'sign' ? "Sign NDA" : "Close"}
+        okText={ndaMode === "sign" ? "Sign NDA" : "Close"}
         cancelText="Cancel"
         confirmLoading={ndaState.loading}
-        okButtonProps={{ disabled: ndaMode === 'sign' ? (!ndaAgreeChecked || ndaState.loading) : false }}
+        okButtonProps={{
+          disabled:
+            ndaMode === "sign" ? !ndaAgreeChecked || ndaState.loading : false,
+        }}
       >
         {loadingDetails ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div style={{ textAlign: "center", padding: "40px" }}>
             <InlineLoading message="Loading meeting details..." />
           </div>
         ) : (
           <div style={{ minHeight: 120 }}>
-            {/* Thông tin meeting */}
             <Descriptions
               title="Meeting Information"
               bordered
@@ -483,32 +629,63 @@ const Roommeet: React.FC = () => {
               size="small"
               style={{ marginBottom: 20 }}
             >
-              <Descriptions.Item label={<span><ProjectOutlined /> Name Project</span>}>
-                {meetingDetails?.projectName || 'N/A'}
+              <Descriptions.Item
+                label={
+                  <span>
+                    <ProjectOutlined /> Name Project
+                  </span>
+                }
+              >
+                {meetingDetails?.projectName || "N/A"}
               </Descriptions.Item>
-              <Descriptions.Item label={<span><UserOutlined /> Fullname Startup</span>}>
-                {meetingDetails?.startupFullName || 'N/A'}
+              <Descriptions.Item
+                label={
+                  <span>
+                    <UserOutlined /> Fullname Startup
+                  </span>
+                }
+              >
+                {meetingDetails?.startupFullName || "N/A"}
               </Descriptions.Item>
-              <Descriptions.Item label={<span><MailOutlined /> Email Startup</span>}>
-                {meetingDetails?.startupEmail || 'N/A'}
+              <Descriptions.Item
+                label={
+                  <span>
+                    <MailOutlined /> Email Startup
+                  </span>
+                }
+              >
+                {meetingDetails?.startupEmail || "N/A"}
               </Descriptions.Item>
-              <Descriptions.Item label={<span><UserOutlined /> Fullname Investor</span>}>
-                {meetingDetails?.investorFullName || 'N/A'}
+              <Descriptions.Item
+                label={
+                  <span>
+                    <UserOutlined /> Fullname Investor
+                  </span>
+                }
+              >
+                {meetingDetails?.investorFullName || "N/A"}
               </Descriptions.Item>
-              <Descriptions.Item label={<span><MailOutlined /> Email Investor</span>}>
-                {meetingDetails?.investorEmail || 'N/A'}
+              <Descriptions.Item
+                label={
+                  <span>
+                    <MailOutlined /> Email Investor
+                  </span>
+                }
+              >
+                {meetingDetails?.investorEmail || "N/A"}
               </Descriptions.Item>
             </Descriptions>
 
-            {/* NDA Content Preview */}
-            <div style={{
-              border: '1px solid #d9d9d9',
-              borderRadius: 6,
-              padding: 16,
-              backgroundColor: '#fafafa',
-              marginBottom: 16
-            }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+            <div
+              style={{
+                border: "1px solid #d9d9d9",
+                borderRadius: 6,
+                padding: 16,
+                backgroundColor: "#fafafa",
+                marginBottom: 16,
+              }}
+            >
+              <Text strong style={{ display: "block", marginBottom: 8 }}>
                 NDA Content:
               </Text>
               <Text type="secondary">
@@ -518,30 +695,121 @@ const Roommeet: React.FC = () => {
             </div>
 
             <div style={{ marginTop: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <label
+                style={{ display: "flex", alignItems: "flex-start", gap: 8 }}
+              >
                 <input
                   type="checkbox"
                   checked={ndaAgreeChecked}
                   onChange={(e) => setNdaAgreeChecked(e.target.checked)}
                   style={{ marginTop: 3 }}
-                  disabled={ndaMode === 'view'}
+                  disabled={ndaMode === "view"}
                 />
                 <span>
-                  I have read, understand, and agree to all terms in this Non-Disclosure Agreement (NDA). I commit to complying with the confidentiality rules set forth in the document.
+                  I have read, understand, and agree to all terms in this
+                  Non-Disclosure Agreement (NDA). I commit to complying with the
+                  confidentiality rules set forth in the document.
                 </span>
               </label>
 
-              {/* Status helper text */}
               <div style={{ marginTop: 10 }}>
-                {currentMeetingRecord?.investorNdaSigned && currentMeetingRecord?.startupNdaSigned ? (
-                  <Text type="success">Both parties have signed the NDA and accepted the terms. The meeting is confirmed. You can join the meeting.</Text>
+                {currentMeetingRecord?.investorNdaSigned &&
+                currentMeetingRecord?.startupNdaSigned ? (
+                  <Text type="success">
+                    Both parties have signed the NDA and accepted the terms. The
+                    meeting is confirmed. You can join the meeting.
+                  </Text>
                 ) : (
-                  <Text type="warning">Waiting for the other party to sign the NDA.</Text>
+                  <Text type="warning">
+                    Waiting for the other party to sign the NDA.
+                  </Text>
                 )}
               </div>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Payment Modal */}
+      <Modal
+        title="Thanh toán phí ký NDA"
+        open={paymentModalVisible}
+        onCancel={() => setPaymentModalVisible(false)}
+        footer={[
+          <Button key="back" onClick={() => setPaymentModalVisible(false)}>
+            Hủy bỏ
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={processingPayment}
+            onClick={handlePaymentAndSign}
+            style={{
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              border: "none",
+              fontWeight: 600,
+            }}
+          >
+            Thanh toán 150,000 VND
+          </Button>,
+        ]}
+      >
+        <Space direction="vertical" style={{ width: "100%" }} size="middle">
+          <div
+            style={{
+              background: "#fff1f0",
+              padding: 12,
+              borderRadius: 6,
+              border: "1px solid #ffa39e",
+            }}
+          >
+            <Text type="danger">
+              Để đảm bảo tính cam kết, bạn cần thanh toán phí hồ sơ NDA là{" "}
+              <b>150,000 VND</b>.
+            </Text>
+          </div>
+
+          <Card
+            size="small"
+            title="Phương thức thanh toán"
+            bordered={false}
+            style={{ background: "#f5f7fa" }}
+          >
+            <Radio.Group
+              onChange={(e: RadioChangeEvent) =>
+                setPaymentMethod(e.target.value)
+              }
+              value={paymentMethod}
+              style={{ display: "flex", flexDirection: "column", gap: 16 }}
+            >
+              <Radio value="WALLET">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <WalletOutlined style={{ fontSize: 20, color: "#1890ff" }} />
+                  <div>
+                    <div style={{ fontWeight: 500 }}>Ví IdeaX</div>
+                    <div style={{ fontSize: 12, color: "#666" }}>
+                      Thanh toán nhanh bằng số dư ví
+                    </div>
+                  </div>
+                </div>
+              </Radio>
+
+              <Radio value="PAYOS">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <CreditCardOutlined
+                    style={{ fontSize: 20, color: "#52c41a" }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 500 }}>Chuyển khoản (PayOS)</div>
+                    <div style={{ fontSize: 12, color: "#666" }}>
+                      Quét mã QR ngân hàng
+                    </div>
+                  </div>
+                </div>
+              </Radio>
+            </Radio.Group>
+          </Card>
+        </Space>
       </Modal>
 
       <MeetingContractModal
