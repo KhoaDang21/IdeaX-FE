@@ -3,7 +3,6 @@ import api from "../../constant/axiosInstance";
 // Kiểu dữ liệu trả về từ API /create-package-order
 interface PackageOrderResponse {
   paymentUrl: string;
-  // ... các trường khác nếu có
 }
 
 // Kiểu dữ liệu trả về từ API /upgrade-packages
@@ -16,10 +15,13 @@ export interface UpgradePackage {
   isActive: boolean;
 }
 
-/**
- * Lấy danh sách các gói nâng cấp đang active
- * API: GET /api/upgrade-packages
- */
+// --- THÊM INTERFACE MỚI KHỚP VỚI BACKEND DTO ---
+export interface PurchaseResponse {
+  message: string;
+  walletBalance: number; // Số dư mới từ DB
+  projectLimit: number;  // Limit mới từ DB
+}
+
 const fetchActivePackages = async (): Promise<UpgradePackage[]> => {
   const response = await api.get<UpgradePackage[]>("/api/upgrade-packages");
   return response.data;
@@ -28,15 +30,13 @@ const fetchActivePackages = async (): Promise<UpgradePackage[]> => {
 /**
  * Mua gói bằng cách trừ tiền từ ví
  * API: POST /api/payments/purchase-with-wallet
+ * Đã sửa: Trả về PurchaseResponse thay vì void
  */
-const purchaseWithWallet = async (packageId: number): Promise<void> => {
-  await api.post("/api/payments/purchase-with-wallet", { packageId });
+const purchaseWithWallet = async (packageId: number): Promise<PurchaseResponse> => {
+  const response = await api.post<PurchaseResponse>("/api/payments/purchase-with-wallet", { packageId });
+  return response.data; // Trả về cục dữ liệu { walletBalance, projectLimit }
 };
 
-/**
- * Tạo đơn hàng (PayOS/VNPay) để mua gói
- * API: POST /api/payments/create-package-order
- */
 const createPackageOrder = async (packageId: number): Promise<PackageOrderResponse> => {
   const response = await api.post<PackageOrderResponse>("/api/payments/create-package-order", { packageId });
   return response.data;

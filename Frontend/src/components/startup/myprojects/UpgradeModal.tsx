@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Button, Card, message, Typography } from "antd";
-import InlineLoading from '../../InlineLoading'
+import InlineLoading from "../../InlineLoading";
 import { useSelector, useDispatch } from "react-redux";
 import { type RootState, type AppDispatch } from "../../../store";
 import { fetchPackages } from "../../../services/features/payment/packageSlice";
 import paymentService from "../../../services/features/payment/paymentService";
-import { getStartupProfile } from "../../../services/features/auth/authSlice"; // Import action refresh profile
+import { getMyWallet } from "../../../services/features/payment/paymentSlice";
+import { setUser } from "../../../services/features/auth/authSlice";
 
 const { Text, Title } = Typography;
 
@@ -16,11 +17,15 @@ interface Props {
 
 export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
   const dispatch = useDispatch<AppDispatch>();
+
   const { packages, loading } = useSelector(
     (state: RootState) => state.package
   );
+
+  const { wallet } = useSelector((state: RootState) => state.payment);
   const { user } = useSelector((state: RootState) => state.auth);
-  const walletBalance = user?.walletBalance || 0; // Giả sử bạn lưu số dư ví ở đây
+
+  const currentBalance = Number(wallet?.balance ?? user?.walletBalance ?? 0);
 
   const [purchaseLoading, setPurchaseLoading] = useState<
     Record<number, boolean>
@@ -29,25 +34,46 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
   useEffect(() => {
     if (open) {
       dispatch(fetchPackages());
+      dispatch(getMyWallet());
     }
   }, [open, dispatch]);
 
-  const handlePurchaseWallet = async (pkg: { id: number; price: number }) => {
-    if (walletBalance < pkg.price) {
+  const handlePurchaseWallet = async (pkg: any) => {
+    if (currentBalance < pkg.price) {
       message.error("Insufficient wallet balance.");
       return;
     }
     setPurchaseLoading((prev) => ({ ...prev, [pkg.id]: true }));
     try {
-      await paymentService.purchaseWithWallet(pkg.id); //
+      // --- GỌI API VÀ NHẬN KẾT QUẢ TỪ BACKEND ---
+      const response = await paymentService.purchaseWithWallet(pkg.id);
+      // response chứa: { walletBalance: number, projectLimit: number, message: string }
+
       message.success("Package upgraded successfully!");
-      // Refresh lại thông tin user (để cập nhật projectLimit mới)
-      if (user?.id) {
-        dispatch(getStartupProfile(user.id));
+
+      // --- CẬP NHẬT STATE & LOCALSTORAGE DỰA TRÊN DỮ LIỆU CHUẨN TỪ SERVER ---
+      if (user) {
+        const updatedUser = {
+          ...user,
+          // Lấy trực tiếp số liệu từ Server trả về, không cần tự tính toán
+          projectLimit: response.projectLimit,
+          walletBalance: response.walletBalance,
+        };
+
+        // 1. Cập nhật Redux (Giao diện đổi ngay)
+        dispatch(setUser(updatedUser));
+
+        // 2. Cập nhật LocalStorage (Giữ số liệu khi F5)
+        localStorage.setItem("user", JSON.stringify(updatedUser));
       }
+      // -----------------------------------------------------------
+
+      dispatch(getMyWallet()); // Đồng bộ lại ví lần nữa cho chắc chắn
       onClose();
     } catch (error: any) {
-      message.error(error.response?.data?.message || "Error purchasing with wallet");
+      message.error(
+        error.response?.data?.message || "Error purchasing with wallet"
+      );
     } finally {
       setPurchaseLoading((prev) => ({ ...prev, [pkg.id]: false }));
     }
@@ -56,10 +82,10 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
   const handlePurchaseGateway = async (packageId: number) => {
     setPurchaseLoading((prev) => ({ ...prev, [packageId]: true }));
     try {
-      const { paymentUrl } = await paymentService.createPackageOrder(packageId); //
+      const { paymentUrl } = await paymentService.createPackageOrder(packageId);
       message.loading("Redirecting to payment gateway...", 1);
       setTimeout(() => {
-        window.location.href = paymentUrl; // Chuyển hướng
+        window.location.href = paymentUrl;
       }, 1000);
     } catch (error: any) {
       message.error(error.response?.data?.message || "Error creating order");
@@ -76,10 +102,15 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
       width={700}
     >
       <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
-        You have reached the project limit. Please choose a package below to continue.
+        You have reached the project limit. Please choose a package below to
+        continue.
       </Text>
-      <Text strong>
-        Wallet balance: {walletBalance.toLocaleString('en-US')} VND
+
+      <Text strong style={{ fontSize: 16 }}>
+        Wallet balance:{" "}
+        <span style={{ color: "#1890ff" }}>
+          {currentBalance.toLocaleString("en-US")} VND
+        </span>
       </Text>
 
       {loading && <InlineLoading />}
@@ -95,7 +126,7 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
               <Button
                 type="primary"
                 loading={purchaseLoading[pkg.id]}
-                disabled={walletBalance < pkg.price}
+                disabled={currentBalance < pkg.price}
                 onClick={() => handlePurchaseWallet(pkg)}
               >
                 Buy with Wallet
@@ -107,7 +138,7 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
                 Pay (PayOS)
               </Button>
             </div>
-            {walletBalance < pkg.price && (
+            {currentBalance < pkg.price && (
               <Text type="danger" style={{ display: "block", marginTop: 8 }}>
                 Insufficient wallet balance. Please top up or pay via PayOS.
               </Text>
