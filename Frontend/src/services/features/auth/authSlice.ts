@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import type { PayloadAction, ActionReducerMapBuilder } from "@reduxjs/toolkit";
 import { message } from "antd";
-// Sửa import: Dùng `api` từ axiosInstance thay vì axios trần
 import { api } from "../../constant/axiosInstance";
 import {
   LOGIN_ENDPOINT,
@@ -12,7 +11,7 @@ import {
   BASE_URL,
   INVESTOR_PROFILE_GET_ENDPOINT,
   INVESTOR_PROFILE_UPDATE_ENDPOINT,
-} from "../../constant/apiConfig"; //
+} from "../../constant/apiConfig";
 import type {
   AuthState,
   LoginCredentials,
@@ -20,7 +19,7 @@ import type {
   InvestorRegisterCredentials,
   User,
   StartupProfileResponse,
-} from "../../../interfaces/auth"; //
+} from "../../../interfaces/auth";
 
 function normalizeRole(
   role: string | undefined
@@ -71,10 +70,9 @@ export const loginUser = createAsyncThunk<
     }: { rejectWithValue: (value: { message: string }) => any }
   ) => {
     try {
-      // Dùng `api.post` thay vì axios, vì LOGIN_ENDPOINT là URL đầy đủ
-      const response = await api.post(LOGIN_ENDPOINT, credentials); //
+      // Dùng `api.post` thay vì axios
+      const response = await api.post(LOGIN_ENDPOINT, credentials);
       const data = response.data;
-      // If backend returns a banned account, treat as failure
       if (data?.account?.status === "BANNED") {
         return rejectWithValue({ message: "Your account has been locked" });
       }
@@ -100,9 +98,7 @@ export const registerStartup = createAsyncThunk<
     }: { rejectWithValue: (value: { message: string }) => any }
   ) => {
     try {
-      // Dùng `api.post`
       const response = await api.post(REGISTER_STARTUP_ENDPOINT, data, {
-        //
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -131,8 +127,7 @@ export const registerInvestor = createAsyncThunk<
     }: { rejectWithValue: (value: { message: string }) => any }
   ) => {
     try {
-      // Dùng `api.post`
-      const response = await api.post(REGISTER_INVESTOR_ENDPOINT, data); //
+      const response = await api.post(REGISTER_INVESTOR_ENDPOINT, data);
       return response.data;
     } catch (err: any) {
       const message =
@@ -150,8 +145,7 @@ export const getStartupProfile = createAsyncThunk<
   { rejectValue: { message: string } }
 >("auth/getStartupProfile", async (accountId, { rejectWithValue }) => {
   try {
-    // Dùng `api.get` (đã có interceptor gắn token)
-    const response = await api.get(STARTUP_PROFILE_GET_ENDPOINT(accountId)); //
+    const response = await api.get(STARTUP_PROFILE_GET_ENDPOINT(accountId));
     return response.data;
   } catch (err: any) {
     const message =
@@ -168,8 +162,7 @@ export const getInvestorProfile = createAsyncThunk<
   { rejectValue: { message: string } }
 >("auth/getInvestorProfile", async (accountId, { rejectWithValue }) => {
   try {
-    // Dùng `api.get`
-    const response = await api.get(INVESTOR_PROFILE_GET_ENDPOINT(accountId)); //
+    const response = await api.get(INVESTOR_PROFILE_GET_ENDPOINT(accountId));
     return response.data;
   } catch (err: any) {
     const message =
@@ -188,9 +181,8 @@ export const updateInvestorProfile = createAsyncThunk<
   "auth/updateInvestorProfile",
   async ({ accountId, profileData }, { rejectWithValue }) => {
     try {
-      // Dùng `api.put`
       const response = await api.put(
-        INVESTOR_PROFILE_UPDATE_ENDPOINT(accountId), //
+        INVESTOR_PROFILE_UPDATE_ENDPOINT(accountId),
         profileData
       );
       return response.data;
@@ -212,9 +204,8 @@ export const updateStartupProfile = createAsyncThunk<
   "auth/updateStartupProfile",
   async ({ accountId, profileData }, { rejectWithValue }) => {
     try {
-      // Dùng `api.put`
       const response = await api.put(
-        STARTUP_PROFILE_UPDATE_ENDPOINT(accountId), //
+        STARTUP_PROFILE_UPDATE_ENDPOINT(accountId),
         profileData,
         {
           headers: {
@@ -267,15 +258,13 @@ const authSlice = createSlice({
           const backendAccount = action.payload.account;
 
           if (backendAccount.status === "BANNED") {
-            // ... (code xử lý BANNED giữ nguyên)
             return;
           }
 
           const startupProfile = action.payload.startupProfile;
           const investorProfile = action.payload.investorProfile;
 
-          // --- SỬA ĐỔI TẠI ĐÂY ---
-          // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
+          // Ép kiểu `any` để lấy các trường BE trả về (projectLimit/walletBalance)
           const backendAccountData = backendAccount as any;
 
           const normalizedUser: User = {
@@ -284,12 +273,12 @@ const authSlice = createSlice({
             fullName:
               startupProfile?.fullName || investorProfile?.fullName || "",
             role: normalizeRole(backendAccount.role as unknown as string),
-            // ... (Tất cả các trường startupProfile/investorProfile)
+            
             companyWebsite: startupProfile?.companyWebsite,
             profilePictureUrl: startupProfile?.profilePictureUrl
               ? startupProfile.profilePictureUrl.startsWith("http")
                 ? startupProfile.profilePictureUrl
-                : `${BASE_URL}${startupProfile.profilePictureUrl}` //
+                : `${BASE_URL}${startupProfile.profilePictureUrl}`
               : undefined,
             companyLogo: startupProfile?.companyLogo,
             startupName: startupProfile?.startupName,
@@ -311,21 +300,16 @@ const authSlice = createSlice({
             twoFactorEnabled:
               (investorProfile as any)?.twoFactorEnabled ?? undefined,
 
-            // --- THÊM 2 DÒNG NÀY ---
-            // Đọc projectLimit và walletBalance từ API đăng nhập
-            // Nếu BE không trả về, gán giá trị mặc định
+            // [QUAN TRỌNG] Lấy projectLimit và walletBalance khi Login
             projectLimit: backendAccountData.projectLimit ?? 2,
             walletBalance: backendAccountData.walletBalance ?? 0,
-            // --- KẾT THÚC THÊM ---
           };
-          // --- KẾT THÚC SỬA ĐỔI ---
 
           state.user = normalizedUser;
           state.token = backendAccount.token || null;
           state.isAuthenticated = true;
           state.error = null;
 
-          // Lưu vào localStorage để khôi phục khi F5
           localStorage.setItem("user", JSON.stringify(normalizedUser));
           if (backendAccount.token) {
             localStorage.setItem("token", backendAccount.token);
@@ -388,11 +372,8 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: StartupProfileResponse }) => {
           state.loading = false;
           if (state.user) {
-            // --- SỬA ĐỔI TẠI ĐÂY ---
-            // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
             const profileData = action.payload as any;
 
-            // Cập nhật user với thông tin profile mới
             state.user = {
               ...state.user,
               fullName: profileData.fullName || state.user.fullName,
@@ -402,7 +383,7 @@ const authSlice = createSlice({
               profilePictureUrl: profileData.profilePictureUrl
                 ? profileData.profilePictureUrl.startsWith("http")
                   ? profileData.profilePictureUrl
-                  : `${BASE_URL}${profileData.profilePictureUrl}` //
+                  : `${BASE_URL}${profileData.profilePictureUrl}`
                 : undefined,
               companyLogo: profileData.companyLogo,
               startupName: profileData.startupName,
@@ -412,16 +393,13 @@ const authSlice = createSlice({
               numberOfTeamMembers: profileData.numberOfTeamMembers,
               aboutUs: profileData.aboutUs,
 
-              // --- THÊM 2 DÒNG NÀY ---
-              // Cập nhật projectLimit/walletBalance khi refresh profile
+              // [QUAN TRỌNG] Cập nhật projectLimit khi refresh profile
               projectLimit:
                 profileData.projectLimit ?? state.user.projectLimit ?? 2,
               walletBalance:
                 profileData.walletBalance ?? state.user.walletBalance ?? 0,
             };
-            // --- KẾT THÚC SỬA ĐỔI ---
 
-            // Cập nhật localStorage
             localStorage.setItem("user", JSON.stringify(state.user));
           }
           state.error = null;
@@ -445,11 +423,8 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: StartupProfileResponse }) => {
           state.loading = false;
           if (state.user) {
-            // --- SỬA ĐỔI TẠI ĐÂY ---
-            // Ép kiểu `any` để lấy các trường BE trả về nhưng interface chưa có
             const profileData = action.payload as any;
 
-            // Cập nhật user với thông tin profile mới
             state.user = {
               ...state.user,
               fullName: profileData.fullName || state.user.fullName,
@@ -459,7 +434,7 @@ const authSlice = createSlice({
               profilePictureUrl: profileData.profilePictureUrl
                 ? profileData.profilePictureUrl.startsWith("http")
                   ? profileData.profilePictureUrl
-                  : `${BASE_URL}${profileData.profilePictureUrl}` //
+                  : `${BASE_URL}${profileData.profilePictureUrl}`
                 : undefined,
               companyLogo: profileData.companyLogo,
               startupName: profileData.startupName,
@@ -469,15 +444,13 @@ const authSlice = createSlice({
               numberOfTeamMembers: profileData.numberOfTeamMembers,
               aboutUs: profileData.aboutUs,
 
-              // --- THÊM 2 DÒNG NÀY ---
+              // [BẢO VỆ] Đảm bảo không bị mất Limit khi update profile
               projectLimit:
                 profileData.projectLimit ?? state.user.projectLimit ?? 2,
               walletBalance:
                 profileData.walletBalance ?? state.user.walletBalance ?? 0,
             };
-            // --- KẾT THÚC SỬA ĐỔI ---
 
-            // Cập nhật localStorage
             localStorage.setItem("user", JSON.stringify(state.user));
           }
           state.error = null;
@@ -503,7 +476,6 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: any }) => {
           state.loading = false;
           if (state.user) {
-            // --- SỬA ĐỔI TẠI ĐÂY ---
             state.user = {
               ...state.user,
               fullName: action.payload.fullName || state.user.fullName,
@@ -520,7 +492,7 @@ const authSlice = createSlice({
               profilePictureUrl: action.payload.profilePictureUrl
                 ? action.payload.profilePictureUrl.startsWith("http")
                   ? action.payload.profilePictureUrl
-                  : `${BASE_URL}${action.payload.profilePictureUrl}` //
+                  : `${BASE_URL}${action.payload.profilePictureUrl}`
                 : state.user.profilePictureUrl,
               country: action.payload.country || state.user.country,
               linkedInProfile:
@@ -528,13 +500,12 @@ const authSlice = createSlice({
               twoFactorEnabled:
                 action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
 
-              // --- THÊM 2 DÒNG NÀY ---
+              // [QUAN TRỌNG] Cập nhật cho Investor
               projectLimit:
                 action.payload.projectLimit ?? state.user.projectLimit ?? 2,
               walletBalance:
                 action.payload.walletBalance ?? state.user.walletBalance ?? 0,
             };
-            // --- KẾT THÚC SỬA ĐỔI ---
 
             localStorage.setItem("user", JSON.stringify(state.user));
           }
@@ -559,7 +530,6 @@ const authSlice = createSlice({
         (state: AuthState, action: { payload: any }) => {
           state.loading = false;
           if (state.user) {
-            // --- SỬA ĐỔI TẠI ĐÂY ---
             state.user = {
               ...state.user,
               fullName: action.payload.fullName || state.user.fullName,
@@ -579,13 +549,12 @@ const authSlice = createSlice({
               twoFactorEnabled:
                 action.payload.twoFactorEnabled ?? state.user?.twoFactorEnabled,
 
-              // --- THÊM 2 DÒNG NÀY ---
+              // [BẢO VỆ] Cập nhật cho Investor
               projectLimit:
                 action.payload.projectLimit ?? state.user.projectLimit ?? 2,
               walletBalance:
                 action.payload.walletBalance ?? state.user.walletBalance ?? 0,
             };
-            // --- KẾT THÚC SỬA ĐỔI ---
 
             localStorage.setItem("user", JSON.stringify(state.user));
           }
