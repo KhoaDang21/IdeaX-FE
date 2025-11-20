@@ -34,19 +34,18 @@ const StartupLayout = () => {
                 style={{
                     width: 260,
                     background: '#DBEAFE',
-                    display: 'flex',
-                    flexDirection: 'column'
+                    position: 'fixed',
+                    left: 0,
+                    top: 0,
+                    height: '100vh',
+                    overflowY: 'auto'
                 }}
             >
                 <StartupSidebar />
             </aside>
 
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                <header style={{ background: '#DBEAFE', borderLeft: '1px solid #d1d5db' }}>
-                    <StartupHeader />
-                </header>
-
-                <main style={{ flex: 1, padding: 16, background: '#ffffff', position: 'relative' }}>
+            <div style={{ marginLeft: 260, display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                <main style={{ flex: 1, padding: 16, background: '#ffffff', position: 'relative', minHeight: '100vh' }}>
                     {routeLoading && (
                         <GlobalLoading />
                     )}
