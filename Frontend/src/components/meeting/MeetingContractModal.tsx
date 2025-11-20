@@ -20,9 +20,15 @@ import type {
   ContractSignPayload,
   ContractStatus,
 } from "../../types/contract";
-import { previewContract, signMeetingContract, fetchContractByMeeting } from "../../services/features/contract/contractSlice";
+import {
+  previewContract,
+  signMeetingContract,
+  fetchContractByMeeting,
+} from "../../services/features/contract/contractSlice";
 import type { RootState, AppDispatch } from "../../store";
 import { api } from "../../services/constant/axiosInstance";
+import ContractPreviewOverlay from "./contract/ContractPreviewOverlay";
+import SignatureCard from "./contract/SignatureCard";
 
 const { Text, Paragraph } = Typography;
 
@@ -332,47 +338,33 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
             {!contractHasSignature && (investorSigned || startupSigned || startupFlowReady) && (
               <div style={{ marginTop: 16, borderTop: "1px solid #d9d9d9", padding: "20px 0" }}>
                 <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
-                    <Text strong style={{ fontSize: 14, display: "block", marginBottom: 12 }}>NHÀ ĐẦU TƯ</Text>
-                    <div style={{ border: "1px solid #d9d9d9", borderRadius: 4, padding: 16, background: "#fff", minHeight: 120 }}>
-                      {displayedContract?.investorSignatureHtml ? (
-                        <div dangerouslySetInnerHTML={{ __html: displayedContract.investorSignatureHtml }} />
-                      ) : (
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ color: "#666", fontSize: 12, marginBottom: 8 }}>
-                            {displayedContract?.investorSignedAt ? `Thời gian: ${displayedContract.investorSignedAt}` : "Ngày ... tháng ... năm 20..."}
-                          </div>
-                          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 12 }}>
-                            {displayedContract?.investorName || meeting?.investorFullName || "Nhà đầu tư"}
-                          </div>
-                          <div style={{ borderTop: "1px solid #000", paddingTop: 8, fontSize: 12, color: "#666" }}>
-                            Ký và ghi rõ họ tên
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <SignatureCard
+                    label="NHÀ ĐẦU TƯ"
+                    signatureHtml={displayedContract?.investorSignatureHtml}
+                    personName={displayedContract?.investorName || meeting?.investorFullName || "Nhà đầu tư"}
+                    signedAtText={
+                      displayedContract?.investorSignedAt
+                        ? `Thời gian: ${displayedContract.investorSignedAt}`
+                        : "Ngày ... tháng ... năm 20..."
+                    }
+                  />
 
-                  <div style={{ flex: 1 }}>
-                    <Text strong style={{ fontSize: 14, display: "block", marginBottom: 12 }}>STARTUP</Text>
-                    <div style={{ border: "1px solid #d9d9d9", borderRadius: 4, padding: 16, background: "#fff", minHeight: 120 }}>
-                      {displayedContract?.startupSignatureHtml ? (
-                        <div dangerouslySetInnerHTML={{ __html: displayedContract.startupSignatureHtml }} />
-                      ) : (
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ color: "#666", fontSize: 12, marginBottom: 8 }}>
-                            {displayedContract?.startupSignedAt ? `Thời gian: ${displayedContract.startupSignedAt}` : "Chờ ký"}
-                          </div>
-                          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 12 }}>
-                            {meeting?.startupFullName || displayedContract?.startupName || contract?.startupName || meeting?.startupName || "Startup"}
-                          </div>
-                          <div style={{ borderTop: "1px solid #000", paddingTop: 8, fontSize: 12, color: "#666" }}>
-                            Ký và ghi rõ họ tên
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <SignatureCard
+                    label="STARTUP"
+                    signatureHtml={displayedContract?.startupSignatureHtml}
+                    personName={
+                      meeting?.startupFullName ||
+                      displayedContract?.startupName ||
+                      contract?.startupName ||
+                      meeting?.startupName ||
+                      "Startup"
+                    }
+                    signedAtText={
+                      displayedContract?.startupSignedAt
+                        ? `Thời gian: ${displayedContract.startupSignedAt}`
+                        : "Chờ ký"
+                    }
+                  />
                 </div>
 
                 {/* If contract view and startup can sign, we'll show checkbox + sign in footer (handled below) */}
@@ -525,51 +517,37 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
             */}
             {((isInvestor && !investorSigned) || (!isInvestor && investorSigned) || (investorSigned && startupSigned)) && (
               <div style={{ marginTop: 16, borderTop: "1px solid #d9d9d9", padding: "20px 0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 20 }}>
-                  {/* Chữ ký Nhà đầu tư - hiển thị khi investor đã ký hoặc đang soạn */}
-                  <div style={{ flex: investorSigned && startupSigned ? 1 : "auto", minWidth: investorSigned && startupSigned ? "auto" : "100%" }}>
-                    <Text strong style={{ fontSize: 14, display: "block", marginBottom: 12 }}>NHÀ ĐẦU TƯ</Text>
-                    <div style={{ border: "1px solid #d9d9d9", borderRadius: 4, padding: 16, background: "#fff", minHeight: 120 }}>
-                      {contract?.investorSignatureHtml ? (
-                        <div dangerouslySetInnerHTML={{ __html: contract.investorSignatureHtml }} />
-                      ) : (
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ color: "#666", fontSize: 12, marginBottom: 8 }}>
-                            {contract?.investorSignedAt ? `Thời gian: ${contract.investorSignedAt}` : "Ngày ... tháng ... năm 20..."}
-                          </div>
-                          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 12 }}>
-                            {contract?.investorName || meeting?.investorFullName || "Nhà đầu tư"}
-                          </div>
-                          <div style={{ borderTop: "1px solid #000", paddingTop: 8, fontSize: 12, color: "#666" }}>
-                            Ký và ghi rõ họ tên
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+                  <SignatureCard
+                    label="NHÀ ĐẦU TƯ"
+                    signatureHtml={contract?.investorSignatureHtml}
+                    personName={contract?.investorName || meeting?.investorFullName || "Nhà đầu tư"}
+                    signedAtText={
+                      contract?.investorSignedAt
+                        ? `Thời gian: ${contract.investorSignedAt}`
+                        : "Ngày ... tháng ... năm 20..."
+                    }
+                    minHeight={120}
+                  />
 
-                  {/* Chữ ký Startup - chỉ hiển thị khi cả 2 đã ký */}
                   {startupSigned && (
-                    <div style={{ flex: 1 }}>
-                      <Text strong style={{ fontSize: 14, display: "block", marginBottom: 12 }}>STARTUP</Text>
-                      <div style={{ border: "1px solid #d9d9d9", borderRadius: 4, padding: 16, background: "#fff", minHeight: 120 }}>
-                        {contract?.startupSignatureHtml ? (
-                          <div dangerouslySetInnerHTML={{ __html: contract.startupSignatureHtml }} />
-                        ) : (
-                          <div style={{ textAlign: "center" }}>
-                            <div style={{ color: "#666", fontSize: 12, marginBottom: 8 }}>
-                              {contract?.startupSignedAt ? `Thời gian: ${contract.startupSignedAt}` : "Chờ ký"}
-                            </div>
-                            <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 12 }}>
-                              {meeting?.startupFullName || displayedContract?.startupName || contract?.startupName || meeting?.startupName || "Startup"}
-                            </div>
-                            <div style={{ borderTop: "1px solid #000", paddingTop: 8, fontSize: 12, color: "#666" }}>
-                              Ký và ghi rõ họ tên
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <SignatureCard
+                      label="STARTUP"
+                      signatureHtml={contract?.startupSignatureHtml}
+                      personName={
+                        meeting?.startupFullName ||
+                        displayedContract?.startupName ||
+                        contract?.startupName ||
+                        meeting?.startupName ||
+                        "Startup"
+                      }
+                      signedAtText={
+                        contract?.startupSignedAt
+                          ? `Thời gian: ${contract.startupSignedAt}`
+                          : "Chờ ký"
+                      }
+                      minHeight={120}
+                    />
                   )}
                 </div>
               </div>
@@ -633,90 +611,14 @@ const MeetingContractModal: React.FC<MeetingContractModalProps> = ({
           )}
         </div>
 
-        {/* Contract Preview Overlay Modal */}
-        <Modal
+        <ContractPreviewOverlay
           open={previewModalOpen}
-          title="Xem trước hợp đồng"
-          width={1000}
-          onCancel={() => setPreviewModalOpen(false)}
-          footer={null}
-          centered
-          destroyOnClose
-        >
-          <div
-            style={{
-              padding: 0,
-              maxHeight: "70vh",
-              overflow: "auto",
-              background: "#fff",
-            }}
-          >
-            <div
-              style={{
-                padding: "20px 24px",
-              }}
-              dangerouslySetInnerHTML={{
-                __html: contractHtml
-                  ? contractHtml.replace(
-                    /<div class="signature-grid">[\s\S]*?<\/div>\s*<p class="footer-note">/gi,
-                    '<p class="footer-note">'
-                  )
-                  : "<p>Điền đủ thông tin ở biểu mẫu rồi bấm <strong>Xem trước hợp đồng</strong> để tạo bản nháp.</p>"
-              }}
-            />
-
-            {/* Phần chữ ký - Chỉ hiển thị chữ ký investor trong preview */}
-            <div style={{
-              marginTop: 0,
-              borderTop: "1px solid #d9d9d9",
-              padding: "20px 24px",
-              background: "#fafafa"
-            }}>
-              <div style={{ maxWidth: 500 }}>
-                <Text strong style={{ fontSize: 14, display: "block", marginBottom: 12 }}>NHÀ ĐẦU TƯ</Text>
-                <div style={{
-                  border: "1px solid #d9d9d9",
-                  borderRadius: 4,
-                  padding: 16,
-                  background: "#fff",
-                  minHeight: 120
-                }}>
-                  {displayedContract?.investorSignatureHtml ? (
-                    <div dangerouslySetInnerHTML={{ __html: displayedContract.investorSignatureHtml }} />
-                  ) : (
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ color: "#666", fontSize: 12, marginBottom: 8 }}>
-                        {displayedContract?.investorSignedAt ? `Thời gian: ${displayedContract.investorSignedAt}` : "Ngày ... tháng ... năm 20..."}
-                      </div>
-                      <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 12 }}>
-                        {displayedContract?.investorName || meeting?.investorFullName || "Nhà đầu tư"}
-                      </div>
-                      <div style={{
-                        borderTop: "1px solid #000",
-                        paddingTop: 8,
-                        fontSize: 12,
-                        color: "#666"
-                      }}>
-                        Ký và ghi rõ họ tên
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 8,
-              padding: "16px 24px",
-              borderTop: "1px solid #f0f0f0",
-              background: "#fff"
-            }}>
-              <Button onClick={() => setPreviewModalOpen(false)}>Đóng</Button>
-            </div>
-          </div>
-        </Modal>
+          contractHtml={contractHtml}
+          investorSignatureHtml={displayedContract?.investorSignatureHtml}
+          investorName={displayedContract?.investorName || meeting?.investorFullName || "Nhà đầu tư"}
+          investorSignedAt={displayedContract?.investorSignedAt}
+          onClose={() => setPreviewModalOpen(false)}
+        />
       </Space>
     </Modal>
   );
