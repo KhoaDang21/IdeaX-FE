@@ -26,7 +26,6 @@ import {
   fetchContractByMeeting,
 } from "../../services/features/contract/contractSlice";
 import type { RootState, AppDispatch } from "../../store";
-import { api } from "../../services/constant/axiosInstance";
 import ContractPreviewOverlay from "./contract/ContractPreviewOverlay";
 import SignatureCard from "./contract/SignatureCard";
 
