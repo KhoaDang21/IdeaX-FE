@@ -135,8 +135,10 @@ const Roommeet: React.FC = () => {
         message.success("Đã trừ 150,000 VND từ ví.");
         await executeSignNdaLogic();
       } else {
-        const res = await api.post("/api/payments/nda/create-payos", {
-          meetingId: currentSigningMeeting,
+        // Gọi API deposit chuẩn
+        const res = await api.post("/api/payments/wallet/deposit", {
+          amount: 150000,
+          paymentMethod: "PAYOS",
         });
 
         if (res.data && res.data.paymentUrl) {

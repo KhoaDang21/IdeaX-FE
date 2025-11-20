@@ -138,9 +138,10 @@ const Room: React.FC = () => {
         message.success("Đã trừ 150,000 VND từ ví.");
         await executeSignNdaLogic();
       } else {
-        // Cách 2: PayOS
-        const res = await api.post("/api/payments/nda/create-payos", {
-          meetingId: currentSigningMeeting,
+        // Cách 2: PayOS - Gọi API deposit chuẩn
+        const res = await api.post("/api/payments/wallet/deposit", {
+          amount: 150000,
+          paymentMethod: "PAYOS",
         });
 
         if (res.data && res.data.paymentUrl) {
