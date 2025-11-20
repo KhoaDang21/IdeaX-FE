@@ -16,19 +16,42 @@ const MyProjects = React.lazy(() => import("../pages/Startup/MyProjects"));
 const Roommeet = React.lazy(() => import("../pages/Startup/Roommeet"));
 const Profile = React.lazy(() => import("../pages/Startup/Profile"));
 const Payment = React.lazy(() => import("../pages/Startup/Payment"));
-const SubmitNewProject = React.lazy(() => import("../pages/Startup/NewProject"));
+const SubmitNewProject = React.lazy(
+  () => import("../pages/Startup/NewProject")
+);
 const FindProjects = React.lazy(() => import("../pages/Investor/FindProjects"));
-const ProgressTracking = React.lazy(() => import("../pages/Investor/ProgressTracking"));
-const InvestedProjects = React.lazy(() => import("../pages/Investor/InvestedProjects"));
+const ProgressTracking = React.lazy(
+  () => import("../pages/Investor/ProgressTracking")
+);
+const InvestedProjects = React.lazy(
+  () => import("../pages/Investor/InvestedProjects")
+);
 const Payments = React.lazy(() => import("../pages/Investor/Payments"));
-const UserManagement = React.lazy(() => import("../pages/Admin/UserManagement"));
-const ProjectManagement = React.lazy(() => import("../pages/Admin/ProjectManagement"));
-const FinancialManagement = React.lazy(() => import("../pages/Admin/FinancialManagement"));
-const RoomAndContract = React.lazy(() => import("../pages/Admin/RoomAndContract"));
-const ProjectDetails = React.lazy(() => import("../pages/Startup/ProjectDetails"));
-const ProfileInvestor = React.lazy(() => import("../pages/Investor/ProfileInvestor"));
+const UserManagement = React.lazy(
+  () => import("../pages/Admin/UserManagement")
+);
+const ProjectManagement = React.lazy(
+  () => import("../pages/Admin/ProjectManagement")
+);
+const FinancialManagement = React.lazy(
+  () => import("../pages/Admin/FinancialManagement")
+);
+const RoomAndContract = React.lazy(
+  () => import("../pages/Admin/RoomAndContract")
+);
+const ProjectDetails = React.lazy(
+  () => import("../pages/Startup/ProjectDetails")
+);
+const ProfileInvestor = React.lazy(
+  () => import("../pages/Investor/ProfileInvestor")
+);
 const Room = React.lazy(() => import("../pages/Investor/Room"));
-const ProjectDetailsadmin = React.lazy(() => import("../pages/Admin/ProjectDetails"));
+const ProjectDetailsadmin = React.lazy(
+  () => import("../pages/Admin/ProjectDetails")
+);
+const AdminWithdrawals = React.lazy(
+  () => import("../pages/Admin/AdminWithdrawals")
+);
 
 // admin layout moved to components/AdminLayout
 
@@ -47,9 +70,13 @@ export default function AppRoutes() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="user-management" element={<UserManagement />} />
           <Route path="project-management" element={<ProjectManagement />} />
-          <Route path="financial-management" element={<FinancialManagement />} />
+          <Route
+            path="financial-management"
+            element={<FinancialManagement />}
+          />
           <Route path="room-and-contract" element={<RoomAndContract />} />
           <Route path="projects/:id" element={<ProjectDetailsadmin />} />
+          <Route path="withdrawals" element={<AdminWithdrawals />} />
         </Route>
         <Route path="/startup" element={<StartupLayout />}>
           <Route path="dashboard" element={<StartupDashboard />} />
