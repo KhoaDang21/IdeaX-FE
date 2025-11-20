@@ -8,13 +8,16 @@ const InvestorLayout = () => {
                 style={{
                     width: 260,
                     background: '#DBEAFE',
-                    display: 'flex',
-                    flexDirection: 'column'
+                    position: 'fixed',
+                    left: 0,
+                    top: 0,
+                    height: '100vh',
+                    overflowY: 'auto'
                 }}
             >
                 <InvestorSidebar />
             </aside>
-            <main style={{ flex: 1, padding: 16 }}>
+            <main style={{ marginLeft: 260, flex: 1, padding: 16, minHeight: '100vh' }}>
                 <Outlet />
             </main>
         </div>

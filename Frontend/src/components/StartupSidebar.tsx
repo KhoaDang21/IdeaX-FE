@@ -1,8 +1,10 @@
 import type { FC, CSSProperties, ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Folder, Briefcase, Users, User, CreditCard, Plus, MessageCircle } from 'lucide-react'
-import { useSelector } from 'react-redux'
+import { Folder, Briefcase, Users, User, CreditCard, Plus, MessageCircle, LogOut } from 'lucide-react'
+import { useSelector, useDispatch } from 'react-redux'
 import type { RootState } from '../store'
+import { App } from 'antd'
+import { logout } from '../services/features/auth/authSlice'
 import logo from '../assets/images/541447718_1863458311190035_8212706485109580334_n.jpg'
 
 const card: CSSProperties = {
@@ -56,7 +58,9 @@ const NavItem: FC<{ to: string; icon: ReactNode; label: string }> = ({ to, icon,
 
 const StartupSidebar: FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
+  const dispatch = useDispatch()
   const navigate = useNavigate()
+  const { message } = App.useApp()
 
   const getInitials = (name?: string, email?: string) =>
     name
@@ -80,75 +84,104 @@ const StartupSidebar: FC = () => {
   ]
 
   return (
-    <aside style={{ width: 260, padding: 16, background: '#DBEAFE' }}>
-      {/* Logo */}
-      <div style={{ margin: '0 0 20px 4px' }}>
-        <img src={logo} alt="Idea" style={{ width: 42, height: 42, borderRadius: 8 }} />
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', padding: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {/* Logo */}
+        <div style={{ margin: '0 0 20px 4px' }}>
+          <img src={logo} alt="Idea" style={{ width: 42, height: 42, borderRadius: 8 }} />
+        </div>
 
-      {/* User Card */}
-      <div style={{ ...card, padding: 16, marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {user?.profilePictureUrl ? (
-            <img
-              src={user.profilePictureUrl}
-              alt="avatar"
-              style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover' }}
-            />
-          ) : (
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                background: '#34419A',
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800
-              }}
-            >
-              {getInitials(user?.fullName, user?.email)}
+        {/* User Card */}
+        <div style={{ ...card, padding: 16, marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {user?.profilePictureUrl ? (
+              <img
+                src={user.profilePictureUrl}
+                alt="avatar"
+                style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  background: '#34419A',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800
+                }}
+              >
+                {getInitials(user?.fullName, user?.email)}
+              </div>
+            )}
+            <div>
+              <div style={{ color: '#0f172a', fontWeight: 700 }}>{user?.fullName || user?.email || 'User'}</div>
+              <div style={{ color: '#6b7280', fontSize: 13 }}>{user?.startupName || 'Startup'}</div>
             </div>
-          )}
-          <div>
-            <div style={{ color: '#0f172a', fontWeight: 700 }}>{user?.fullName || user?.email || 'User'}</div>
-            <div style={{ color: '#6b7280', fontSize: 13 }}>{user?.startupName || 'Startup'}</div>
+          </div>
+        </div>
+
+        {/* Menu */}
+        <div style={{ marginBottom: 14, color: '#6b7280', fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>
+          STARTUP PORTAL
+        </div>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {menuItems.map(item => (
+            <NavItem key={item.to} {...item} />
+          ))}
+        </nav>
+
+        {/* Quick Actions */}
+        <div
+          style={{
+            marginTop: 18,
+            padding: 14,
+            borderRadius: 16,
+            background: 'linear-gradient(135deg,#3FC7F4,#34419A)'
+          }}
+        >
+          <div style={{ color: '#ffffff', fontWeight: 700, marginBottom: 12, fontSize: 20 }}>Quick Actions</div>
+
+          <div style={{ display: 'grid', gap: 12 }}>
+            {actions.map((action, i) => (
+              <button key={i} onClick={action.onClick} style={buttonBase}>
+                {action.icon} {action.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
-
-      {/* Menu */}
-      <div style={{ marginBottom: 14, color: '#6b7280', fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>
-        STARTUP PORTAL
+      {/* Logout at bottom */}
+      <div style={{ marginTop: 'auto' }}>
+        <button
+          onClick={() => {
+            message?.success({ content: 'Logged out successfully', key: 'logout', duration: 1.2 })
+            dispatch(logout())
+            setTimeout(() => navigate('/login'), 800)
+          }}
+          style={{
+            width: '100%',
+            marginTop: 16,
+            padding: '10px 14px',
+            borderRadius: 10,
+            border: '1px solid #ef4444',
+            background: '#fff',
+            color: '#ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+          title="Logout"
+        >
+          <LogOut size={18} /> Logout
+        </button>
       </div>
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {menuItems.map(item => (
-          <NavItem key={item.to} {...item} />
-        ))}
-      </nav>
-
-      {/* Quick Actions */}
-      <div
-        style={{
-          marginTop: 18,
-          padding: 14,
-          borderRadius: 16,
-          background: 'linear-gradient(135deg,#3FC7F4,#34419A)'
-        }}
-      >
-        <div style={{ color: '#ffffff', fontWeight: 700, marginBottom: 12, fontSize: 20 }}>Quick Actions</div>
-
-        <div style={{ display: 'grid', gap: 12 }}>
-          {actions.map((action, i) => (
-            <button key={i} onClick={action.onClick} style={buttonBase}>
-              {action.icon} {action.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </aside>
+    </div>
   )
 }
 
