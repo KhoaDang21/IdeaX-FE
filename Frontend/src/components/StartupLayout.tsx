@@ -1,5 +1,4 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import StartupHeader from './StartupHeader'
 import StartupSidebar from './StartupSidebar'
 import { useEffect, useState } from 'react'
 import GlobalLoading from './GlobalLoading'
