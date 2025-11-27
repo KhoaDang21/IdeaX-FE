@@ -4,6 +4,7 @@ import { BASE_URL } from "./apiConfig";
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
+  timeout: 30000, 
 });
 
 // Request interceptor to add token
@@ -40,6 +41,12 @@ axiosInstance.interceptors.response.use(
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
     }
+    
+    // Handle timeout errors
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      error.message = 'Request timeout. Please try again.';
+    }
+    
     return Promise.reject(error);
   }
 );
