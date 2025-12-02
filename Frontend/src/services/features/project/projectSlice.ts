@@ -18,6 +18,7 @@ import type { Milestone } from "../../../interfaces/milestone";
 interface ProjectState {
   projects: Project[];
   milestones: Milestone[];
+  signedProjects: Project[];  
   project: Project | null; // Add field for single project
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
@@ -27,6 +28,7 @@ interface ProjectState {
 const initialState: ProjectState = {
   projects: [],
   milestones: [],
+  signedProjects: [],
   project: null, // Initialize as null
   status: "idle",
   error: null,
@@ -310,6 +312,22 @@ interface RejectedAction extends UnknownAction {
   error?: { message: string };
 }
 
+// getSignedProjects
+export const getSignedProjects = createAsyncThunk<
+  Project[],
+  void,
+  { rejectValue: string; state: RootState }
+>("projects/getSigned", async (_, { rejectWithValue }) => {
+  try {
+    const res = await api.get("/projects/signed"); //
+    return res.data;
+  } catch (err: any) {
+    return rejectWithValue(
+      err.response?.data?.message || "Failed to get signed projects"
+    );
+  }
+});
+
 /* ------------------ SLICE ------------------ */
 const projectSlice = createSlice({
   name: "projects",
@@ -377,6 +395,10 @@ const projectSlice = createSlice({
         if (state.project && state.project.id === action.payload.id) {
           state.project = action.payload;
         }
+      })
+      .addCase(getSignedProjects.fulfilled, (state, action) => {
+        state.signedProjects = action.payload; // Lưu vào mảng riêng
+        state.status = "succeeded";
       })
       /* MILESTONES CRUD */
       .addCase(getMilestonesByProject.fulfilled, (state, action) => {
