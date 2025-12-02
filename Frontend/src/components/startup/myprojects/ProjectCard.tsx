@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { Popconfirm, Tooltip } from "antd";
+import { Popconfirm, Tooltip, Progress } from "antd"; // Đã thêm Progress
 import { DeleteOutlined } from "@ant-design/icons";
 import type { ProjectUI } from "../../../interfaces/startup/myprojects";
 
@@ -76,6 +76,7 @@ export const ProjectCard: FC<Props> = ({
         transition: "all 0.2s ease",
       }}
     >
+      {/* Header: Title & Status */}
       <div
         style={{
           display: "flex",
@@ -128,19 +129,54 @@ export const ProjectCard: FC<Props> = ({
         </div>
       </div>
 
-      <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>
-        Target: {project.target}
+      {/* Target Info */}
+      <p style={{ margin: "12px 0 4px", fontSize: 12, color: "#64748b" }}>
+        Target:{" "}
+        <span style={{ color: "#1e293b", fontWeight: 500 }}>
+          {project.target}
+        </span>
       </p>
+
+      {/* Raised Info & Progress Bar */}
+      <div style={{ marginBottom: 8 }}>
+        {/* 👇 SỬA DÒNG NÀY: Đổi space-between thành flex-start và thêm gap */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-start",
+            gap: "4px",
+            fontSize: 12,
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ color: "#64748b" }}>Raised:</span>
+          <span style={{ fontWeight: 600, color: "#10b981" }}>
+            {project.raised}
+          </span>
+        </div>
+        <Progress
+          percent={project.progress}
+          showInfo={false}
+          size="small"
+          strokeColor="#3b82f6"
+          trailColor="#e5e7eb"
+        />
+      </div>
+
+      {/* Stage Info */}
       <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
         Stage: {project.stage}
       </p>
 
+      {/* Footer: Investors & Button */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           marginTop: 12,
+          paddingTop: 12,
+          borderTop: "1px solid #f1f5f9",
         }}
       >
         <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
@@ -153,14 +189,17 @@ export const ProjectCard: FC<Props> = ({
           }}
           style={{
             color: "#3b82f6",
-            padding: "4px 12px",
+            padding: "6px 12px",
             borderRadius: 6,
             fontSize: 12,
             fontWeight: 500,
-            background: "none",
+            background: "#eff6ff",
             border: "none",
             cursor: "pointer",
+            transition: "background 0.2s",
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#dbeafe")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#eff6ff")}
         >
           View Details
         </button>

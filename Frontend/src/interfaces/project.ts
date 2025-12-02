@@ -1,5 +1,8 @@
+import type { valueType } from "antd/es/statistic/utils";
+
 // src/interfaces/project.ts
 export interface Project {
+  fundingReceived: valueType | undefined;
   investorClicks: number;
   id: number;
   projectName: string;

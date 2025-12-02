@@ -52,6 +52,9 @@ const ProjectDetailsadmin = React.lazy(
 const AdminWithdrawals = React.lazy(
   () => import("../pages/Admin/AdminWithdrawals")
 );
+const InvestorProjectDetails = React.lazy(
+  () => import("../pages/Investor/InvestorProjectDetails")
+);
 
 // admin layout moved to components/AdminLayout
 
@@ -94,6 +97,7 @@ export default function AppRoutes() {
           <Route path="room" element={<Room />} />
           <Route path="payments" element={<Payments />} />
           <Route path="profile-investor" element={<ProfileInvestor />} />
+          <Route path="projects/:id" element={<InvestorProjectDetails />} />
         </Route>
         <Route path="*" element={<Home />} />
       </Routes>

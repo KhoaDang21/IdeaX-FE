@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { message, Form, Button } from "antd"; // Đã thêm Modal, Button
+import { message, Form, Button } from "antd";
 import type { RootState, AppDispatch } from "../../store";
 import {
   getMyProjects,
@@ -18,7 +18,7 @@ import type {
   MilestoneUI,
 } from "../../interfaces/startup/myprojects";
 
-// Import các component con
+// Import components
 import { ProjectPageHeader } from "../../components/startup/myprojects/ProjectPageHeader";
 import { ProjectCarousel } from "../../components/startup/myprojects/ProjectCarousel";
 import { ProjectTimeline } from "../../components/startup/myprojects/ProjectTimeline";
@@ -26,10 +26,9 @@ import { MilestoneList } from "../../components/startup/myprojects/MilestoneList
 import { ProjectMetrics } from "../../components/startup/myprojects/ProjectMetrics";
 import { QuickActions } from "../../components/startup/myprojects/QuickActions";
 import { AddMilestoneModal } from "../../components/startup/myprojects/AddMilestoneModal";
-// --- THÊM IMPORT MODAL NÂNG CẤP ---
 import { UpgradeModal } from "../../components/startup/myprojects/UpgradeModal";
 
-// --- Các hàm helper (formatCurrency, getFundingRangeDisplay, etc.) giữ nguyên ---
+// --- Helpers ---
 const formatCurrency = (amount: number): string => {
   if (amount === 0) return "$0";
   if (amount >= 1000000) {
@@ -38,16 +37,6 @@ const formatCurrency = (amount: number): string => {
     return `$${(amount / 1000).toFixed(1)}K`;
   }
   return `$${amount}`;
-};
-
-const getFundingRangeDisplay = (fundingRange: string): string => {
-  const rangeMap: { [key: string]: string } = {
-    UNDER_50K: "UNDER $50K",
-    FROM_50K_TO_200K: "$50K - $200K",
-    FROM_200K_TO_1M: "$200K - $1M",
-    OVER_1M: "Over $1M",
-  };
-  return rangeMap[fundingRange] || "Not specified";
 };
 
 const generateTimeline = (project: ApiProject): ProjectUI["timeline"] => {
@@ -106,7 +95,7 @@ const calculateCompletionFromTimeline = (
     ? Math.floor((completedStages / totalStages) * 100)
     : 0;
 };
-// --- Kết thúc hàm helper ---
+// --- End Helpers ---
 
 const MyProjects: React.FC = () => {
   const navigate = useNavigate();
@@ -116,7 +105,7 @@ const MyProjects: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
 
-  // --- THÊM STATE CHO MODAL NÂNG CẤP ---
+  // State cho Upgrade Modal
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const {
@@ -126,8 +115,12 @@ const MyProjects: React.FC = () => {
     error,
   } = useSelector((state: RootState) => state.project);
 
-  // --- LẤY USER TỪ REDUX ---
   const { user } = useSelector((state: RootState) => state.auth);
+
+  // --- TÍNH TOÁN GIỚI HẠN DỰ ÁN ---
+  const currentProjectCount = apiProjects?.length || 0;
+  // Mặc định là 0 hoặc lấy từ user nếu đã load xong
+  const projectLimit = user?.projectLimit || 0;
 
   // Tính toán danh sách projects UI
   const projects = useMemo((): ProjectUI[] => {
@@ -169,22 +162,21 @@ const MyProjects: React.FC = () => {
         title: project.projectName || "Untitled Project",
         status: project.status || "Unknown",
         progress,
-        raised: formatCurrency(project.fundingAmount || 0),
-        target: getFundingRangeDisplay(project.fundingRange),
+        raised: formatCurrency((project as any).fundingReceived || 0),
+        target: formatCurrency(project.fundingAmount || 0),
         stage,
         timeline,
-        milestones: [], // Sẽ được thêm vào sau trong selectedProjectData
+        milestones: [],
         metrics: {
           activeInvestors: project.investorClicks || 0,
-          completedMilestones: 0, // Tạm thời để 0
-          totalMilestones: 0, // Tạm thời để 0
+          completedMilestones: 0,
+          totalMilestones: 0,
           completion,
         },
       };
     });
   }, [apiProjects]);
 
-  // Tính toán dữ liệu project được chọn (bao gồm milestones)
   const selectedProjectData = useMemo(() => {
     const project = projects.find((p) => p.id === selectedProject);
     if (!project) return null;
@@ -216,7 +208,6 @@ const MyProjects: React.FC = () => {
     };
   }, [projects, selectedProject, apiMilestones]);
 
-  // --- useEffects (giữ nguyên) ---
   useEffect(() => {
     dispatch(getMyProjects());
   }, [dispatch]);
@@ -233,21 +224,19 @@ const MyProjects: React.FC = () => {
     }
   }, [selectedProject, dispatch]);
 
-  // --- HÀM HANDLERS ---
+  // --- Handlers ---
 
-  // --- SỬA HÀM handleNewProject ---
   const handleNewProject = () => {
-    const currentProjectCount = apiProjects?.length || 0;
-    // Lấy limit từ user, mặc định là 2 nếu user chưa load kịp
-    const projectLimit = user?.projectLimit || 2;
-
     if (currentProjectCount >= projectLimit) {
-      // ĐÃ ĐẠT GIỚI HẠN -> MỞ MODAL NÂNG CẤP
+      message.warning("You have reached your project limit. Please upgrade!");
       setIsUpgradeModalOpen(true);
     } else {
-      // CHƯA ĐẠT -> CHO TẠO MỚI
       navigate("/startup/new-project");
     }
+  };
+
+  const handleBuyMore = () => {
+    setIsUpgradeModalOpen(true);
   };
 
   const handleDeleteProject = async (projectId: number) => {
@@ -284,7 +273,6 @@ const MyProjects: React.FC = () => {
 
   const handleDeleteMilestone = async (milestoneId: number) => {
     if (!selectedProject) return;
-
     const milestoneToDelete = apiMilestones?.find((m) => m.id === milestoneId);
     const currentProject = projects.find((p) => p.id === selectedProject);
 
@@ -336,7 +324,6 @@ const MyProjects: React.FC = () => {
       form.resetFields();
     } catch (error: any) {
       message.error(error || "Failed to create milestone");
-      console.error("Failed to create milestone:", error);
     }
   };
 
@@ -344,7 +331,7 @@ const MyProjects: React.FC = () => {
     navigate(`/startup/projects/${projectId}`);
   };
 
-  // --- RENDER ---
+  // --- Render ---
 
   if (status === "loading" && projects.length === 0) {
     return (
@@ -370,65 +357,67 @@ const MyProjects: React.FC = () => {
     );
   }
 
-  if (projects.length === 0 && status === "succeeded") {
-    return (
-      <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
+  return (
+    <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
+      {/* Luôn hiển thị Header để thấy thông tin Limit và nút Buy */}
+      <ProjectPageHeader
+        onNewProject={handleNewProject}
+        onBuyMore={handleBuyMore}
+        currentCount={currentProjectCount}
+        maxLimit={projectLimit}
+      />
+
+      {projects.length === 0 && status === "succeeded" ? (
         <div style={{ textAlign: "center", padding: "40px 0" }}>
           <h3>No projects found</h3>
           <p>Create your first project to get started</p>
           <Button
             type="primary"
             size="large"
-            onClick={handleNewProject} // Đã được canh gác
+            onClick={handleNewProject}
             style={{ background: "#38bdf8" }}
           >
             Create New Project
           </Button>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
-      <ProjectPageHeader onNewProject={handleNewProject} />
-
-      <ProjectCarousel
-        projects={projects}
-        selectedProject={selectedProject}
-        deletingProjectIds={deletingProjectIds}
-        onSelectProject={setSelectedProject}
-        onDeleteProject={handleDeleteProject}
-        onViewDetails={handleViewDetails}
-      />
-
-      {selectedProjectData && (
+      ) : (
         <>
-          {/* Middle Section */}
-          <div
-            style={{
-              display: "flex",
-              gap: 24,
-              flexWrap: "wrap",
-              marginBottom: 24,
-            }}
-          >
-            <ProjectTimeline
-              title={selectedProjectData.title}
-              timeline={selectedProjectData.timeline}
-            />
-            <MilestoneList
-              milestones={selectedProjectData.milestones}
-              onAddMilestone={() => setIsModalOpen(true)}
-              onDeleteMilestone={handleDeleteMilestone}
-            />
-          </div>
+          <ProjectCarousel
+            projects={projects}
+            selectedProject={selectedProject}
+            deletingProjectIds={deletingProjectIds}
+            onSelectProject={setSelectedProject}
+            onDeleteProject={handleDeleteProject}
+            onViewDetails={handleViewDetails}
+          />
 
-          {/* Metrics & Quick Actions */}
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            <ProjectMetrics metrics={selectedProjectData.metrics} />
-            <QuickActions />
-          </div>
+          {selectedProjectData && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 24,
+                  flexWrap: "wrap",
+                  marginBottom: 24,
+                }}
+              >
+                <ProjectTimeline
+                  title={selectedProjectData.title}
+                  timeline={selectedProjectData.timeline}
+                />
+                <MilestoneList
+                  milestones={selectedProjectData.milestones}
+                  onAddMilestone={() => setIsModalOpen(true)}
+                  onDeleteMilestone={handleDeleteMilestone}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                <ProjectMetrics metrics={selectedProjectData.metrics} />
+                <QuickActions />
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -442,7 +431,6 @@ const MyProjects: React.FC = () => {
         form={form}
       />
 
-      {/* --- THÊM MODAL NÂNG CẤP --- */}
       <UpgradeModal
         open={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}
