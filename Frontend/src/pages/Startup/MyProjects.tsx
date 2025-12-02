@@ -39,16 +39,6 @@ const formatCurrency = (amount: number): string => {
   return `$${amount}`;
 };
 
-const getFundingRangeDisplay = (fundingRange: string): string => {
-  const rangeMap: { [key: string]: string } = {
-    UNDER_50K: "UNDER $50K",
-    FROM_50K_TO_200K: "$50K - $200K",
-    FROM_200K_TO_1M: "$200K - $1M",
-    OVER_1M: "Over $1M",
-  };
-  return rangeMap[fundingRange] || "Not specified";
-};
-
 const generateTimeline = (project: ApiProject): ProjectUI["timeline"] => {
   const stages = ["Initial Review", "Contract Signing", "Funding Completion"];
   return stages.map((stage) => {
@@ -172,8 +162,8 @@ const MyProjects: React.FC = () => {
         title: project.projectName || "Untitled Project",
         status: project.status || "Unknown",
         progress,
-        raised: formatCurrency(project.fundingAmount || 0),
-        target: getFundingRangeDisplay(project.fundingRange),
+        raised: formatCurrency((project as any).fundingReceived || 0),
+        target: formatCurrency(project.fundingAmount || 0),
         stage,
         timeline,
         milestones: [],
