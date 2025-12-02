@@ -8,6 +8,7 @@ import {
   Card,
   Typography,
   Tag,
+  Progress,
   Button,
   Statistic,
   Space,
@@ -20,6 +21,8 @@ import {
   CheckCircleOutlined,
   ArrowRightOutlined,
   DollarCircleOutlined,
+  BankOutlined,
+  SearchOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
 
@@ -30,6 +33,7 @@ import type { Project } from "../../interfaces/project";
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
 
+// --- Helper Functions ---
 const formatCurrency = (amount: number | undefined): string => {
   if (amount === undefined || amount === null) return "0 ₫";
   return new Intl.NumberFormat("vi-VN", {
@@ -37,6 +41,15 @@ const formatCurrency = (amount: number | undefined): string => {
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(amount);
+};
+
+const getFundingPercentage = (
+  received: number = 0,
+  goal: number = 1
+): number => {
+  if (goal <= 0) return 0;
+  const percent = (received / goal) * 100;
+  return Math.min(Math.round(percent), 100);
 };
 
 const getCategoryColor = (category: string) => {
@@ -59,6 +72,7 @@ const InvestedProjects: React.FC = () => {
     (state: RootState) => state.project
   );
 
+  // Local state cho bộ lọc và tìm kiếm
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
@@ -66,6 +80,7 @@ const InvestedProjects: React.FC = () => {
     dispatch(getSignedProjects());
   }, [dispatch]);
 
+  // Logic lọc dự án
   const filteredProjects = useMemo(() => {
     if (!signedProjects) return [];
 
@@ -73,7 +88,17 @@ const InvestedProjects: React.FC = () => {
       const matchesSearch = project.projectName
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
-      return matchesSearch;
+
+      // Giả sử logic lọc trạng thái (bạn có thể điều chỉnh theo enum ProjectStatus thực tế)
+      let matchesStatus = true;
+      if (statusFilter !== "ALL") {
+        if (statusFilter === "FUNDING")
+          matchesStatus = project.status !== "COMPLETE"; // Ví dụ
+        else if (statusFilter === "COMPLETED")
+          matchesStatus = project.status === "COMPLETE";
+      }
+
+      return matchesSearch && matchesStatus;
     });
   }, [signedProjects, searchTerm, statusFilter]);
 
@@ -82,6 +107,10 @@ const InvestedProjects: React.FC = () => {
   };
 
   const renderProjectCard = (project: Project) => {
+    const percent = getFundingPercentage(
+      Number(project.fundingReceived),
+      Number(project.fundingAmount)
+    );
     const logoUrl = project.files?.find(
       (f) => f.fileType === "LOGO" || f.fileType === "IMAGE"
     )?.fileUrl;
@@ -152,6 +181,7 @@ const InvestedProjects: React.FC = () => {
             </div>
           }
         >
+          {/* Header Info */}
           <div style={{ marginBottom: 12 }}>
             <Title
               level={4}
@@ -183,6 +213,7 @@ const InvestedProjects: React.FC = () => {
               "No description available for this project."}
           </Paragraph>
 
+          {/* Funding Metrics */}
           <div
             style={{
               marginTop: "auto",
@@ -190,18 +221,72 @@ const InvestedProjects: React.FC = () => {
               borderTop: "1px solid #f0f0f0",
             }}
           >
-            {/* Chỉ hiển thị Raised */}
+            <Row gutter={16} style={{ marginBottom: 12 }}>
+              <Col span={12}>
+                <Statistic
+                  title={
+                    <span style={{ fontSize: 12, color: "#6b7280" }}>
+                      Raised
+                    </span>
+                  }
+                  value={project.fundingReceived}
+                  formatter={(val) => formatCurrency(Number(val))}
+                  valueStyle={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#059669",
+                  }}
+                  prefix={<DollarCircleOutlined style={{ fontSize: 14 }} />}
+                />
+              </Col>
+              <Col span={12}>
+                <Statistic
+                  title={
+                    <span style={{ fontSize: 12, color: "#6b7280" }}>Goal</span>
+                  }
+                  value={project.fundingAmount}
+                  formatter={(val) => formatCurrency(Number(val))}
+                  valueStyle={{
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                  prefix={<BankOutlined style={{ fontSize: 14 }} />}
+                />
+              </Col>
+            </Row>
+
             <div style={{ marginBottom: 16 }}>
-              <Statistic
-                title={
-                  <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    Total Raised
-                  </span>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 4,
+                }}
+              >
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Funding Progress
+                </Text>
+                <Text
+                  strong
+                  style={{
+                    fontSize: 12,
+                    color: percent >= 100 ? "#059669" : "#2563eb",
+                  }}
+                >
+                  {percent}%
+                </Text>
+              </div>
+              <Progress
+                percent={percent}
+                showInfo={false}
+                strokeColor={
+                  percent >= 100
+                    ? "#059669"
+                    : { "0%": "#3b82f6", "100%": "#2563eb" }
                 }
-                value={project.fundingReceived}
-                formatter={(val) => formatCurrency(Number(val))}
-                valueStyle={{ fontSize: 20, fontWeight: 700, color: "#059669" }}
-                prefix={<DollarCircleOutlined style={{ fontSize: 18 }} />}
+                size="small"
+                status="active"
               />
             </div>
 
@@ -225,16 +310,21 @@ const InvestedProjects: React.FC = () => {
 
   return (
     <div style={{ padding: 24, minHeight: "100vh", background: "#f8fafc" }}>
+      {/* Page Header */}
       <div
         style={{
           marginBottom: 32,
           background: "#fff",
           padding: "32px",
           borderRadius: 16,
-          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+          boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 24,
         }}
       >
-        <div style={{ marginBottom: 24 }}>
+        <div>
           <Title level={2} style={{ color: "#1e3a8a", margin: "0 0 8px" }}>
             My Investment Portfolio
           </Title>
@@ -244,10 +334,16 @@ const InvestedProjects: React.FC = () => {
           </Text>
         </div>
 
+        {/* Filter & Search Bar */}
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <Search
-            placeholder="Search projects..."
+            placeholder="Search projects by name..."
             allowClear
+            enterButton={
+              <Button icon={<SearchOutlined />} type="primary">
+                Search
+              </Button>
+            }
             size="large"
             style={{ maxWidth: 400, flex: 1 }}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -267,7 +363,9 @@ const InvestedProjects: React.FC = () => {
         </div>
       </div>
 
-      {status === "loading" ? (
+      {/* Content Area */}
+      {status === "loading" &&
+      (!signedProjects || signedProjects.length === 0) ? (
         <Row gutter={[24, 24]}>
           {[1, 2, 3, 4].map((i) => (
             <Col xs={24} sm={12} lg={8} xl={6} key={i}>
@@ -284,12 +382,61 @@ const InvestedProjects: React.FC = () => {
             borderRadius: 16,
             padding: 80,
             textAlign: "center",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
           }}
         >
-          <Empty description="No projects found" />
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={
+              <div style={{ marginTop: 16 }}>
+                <Title level={4} style={{ color: "#64748b" }}>
+                  {searchTerm
+                    ? "No projects found matching your search"
+                    : "Your portfolio is empty"}
+                </Title>
+                <Text type="secondary">
+                  {searchTerm
+                    ? "Try adjusting your filters or search terms."
+                    : "Start exploring potential opportunities to build your portfolio."}
+                </Text>
+              </div>
+            }
+          >
+            {!searchTerm && (
+              <Button
+                type="primary"
+                size="large"
+                icon={<RocketOutlined />}
+                onClick={() => navigate("/investor/find-projects")}
+                style={{
+                  marginTop: 24,
+                  padding: "0 32px",
+                  height: 44,
+                  borderRadius: 8,
+                }}
+              >
+                Find Projects to Invest
+              </Button>
+            )}
+          </Empty>
         </div>
       ) : (
-        <Row gutter={[24, 24]}>{filteredProjects.map(renderProjectCard)}</Row>
+        <>
+          <div
+            style={{
+              marginBottom: 16,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text strong style={{ fontSize: 16, color: "#4b5563" }}>
+              Showing {filteredProjects.length}{" "}
+              {filteredProjects.length === 1 ? "Project" : "Projects"}
+            </Text>
+          </div>
+          <Row gutter={[24, 24]}>{filteredProjects.map(renderProjectCard)}</Row>
+        </>
       )}
     </div>
   );
