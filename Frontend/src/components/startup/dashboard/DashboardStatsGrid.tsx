@@ -4,8 +4,7 @@ import {
   FundOutlined,
   DollarCircleOutlined,
   TeamOutlined,
-  EyeOutlined,
-  ArrowUpOutlined,
+  SolutionOutlined,
 } from "@ant-design/icons";
 import type { DashboardStats } from "../../../interfaces/startup/dashboard";
 
@@ -19,9 +18,7 @@ export const DashboardStatsGrid: FC<Props> = ({ stats, formatCurrency }) => {
     <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
       <Col xs={24} lg={6}>
         <Card
-          styles={{
-            body: { padding: 20 },
-          }}
+          styles={{ body: { padding: 20 } }}
           style={{
             background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
             border: "none",
@@ -37,14 +34,13 @@ export const DashboardStatsGrid: FC<Props> = ({ stats, formatCurrency }) => {
           >
             <div>
               <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 8 }}>
-                TOTAL FUNDING
+                TOTAL RECEIVED FUNDING
               </div>
               <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
                 {formatCurrency(stats.fundingRaised)}
               </div>
               <div style={{ fontSize: 12, opacity: 0.9 }}>
-                <ArrowUpOutlined style={{ marginRight: 4 }} />
-                {stats.growthRate}% growth
+                Actual money received
               </div>
             </div>
             <DollarCircleOutlined style={{ fontSize: 32, opacity: 0.8 }} />
@@ -61,35 +57,37 @@ export const DashboardStatsGrid: FC<Props> = ({ stats, formatCurrency }) => {
             valueStyle={{ color: "#3b82f6" }}
           />
           <div style={{ marginTop: 8, fontSize: 12, color: "#10b981" }}>
-            <ArrowUpOutlined /> {stats.growthRate}% growth
+            In your portfolio
           </div>
         </Card>
       </Col>
 
       <Col xs={24} lg={6}>
+        {/* Trước đây là Investor Engagement -> Giờ là Signed Contracts */}
         <Card styles={{ body: { padding: 20 } }}>
           <Statistic
-            title="Investor Engagement"
-            value={stats.interestedInvestors}
-            prefix={<TeamOutlined />}
+            title="Signed Contracts"
+            value={stats.interestedInvestors} // Đã map logic ở Dashboard.tsx
+            prefix={<SolutionOutlined />}
             valueStyle={{ color: "#10b981" }}
           />
           <div style={{ marginTop: 8, fontSize: 12, color: "#10b981" }}>
-            Across all projects
+            Investors fully onboarded
           </div>
         </Card>
       </Col>
 
       <Col xs={24} lg={6}>
+        {/* Trước đây là Avg per Project -> Giờ là Interested Investors (Meetings) */}
         <Card styles={{ body: { padding: 20 } }}>
           <Statistic
-            title="Avg. per Project"
-            value={stats.avgInvestorEngagement}
-            prefix={<EyeOutlined />}
+            title="Interested Investors"
+            value={stats.avgInvestorEngagement} // Đã map logic ở Dashboard.tsx
+            prefix={<TeamOutlined />}
             valueStyle={{ color: "#8b5cf6" }}
           />
           <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
-            Investor engagement
+            Have created meetings
           </div>
         </Card>
       </Col>

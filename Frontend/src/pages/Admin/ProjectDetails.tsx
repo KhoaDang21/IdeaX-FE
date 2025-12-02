@@ -18,17 +18,7 @@ import {
   FileOutlined,
   BarChartOutlined,
 } from "@ant-design/icons";
-
-// Utility to format funding range display
-const getFundingRangeDisplay = (fundingRange: string): string => {
-  const rangeMap: { [key: string]: string } = {
-    UNDER_50K: "Under $50K",
-    FROM_50K_TO_200K: "$50K - $200K",
-    FROM_200K_TO_1M: "$200K - $1M",
-    OVER_1M: "Over $1M",
-  };
-  return rangeMap[fundingRange] || "Not specified";
-};
+import { getFundingRangeDisplay } from "../../utils/projectUtils";
 
 // Utility to format status text
 const getStatusText = (status: string): string => {

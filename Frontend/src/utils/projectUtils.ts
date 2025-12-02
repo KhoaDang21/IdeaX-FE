@@ -1,9 +1,9 @@
 export const getFundingRangeDisplay = (fundingRange: string): string => {
   const rangeMap: { [key: string]: string } = {
-    UNDER_50K: "UNDER $50K",
-    FROM_50K_TO_200K: "$50K - $200K",
-    FROM_200K_TO_1M: "$200K - $1M",
-    OVER_1M: "Over $1M",
+    "Under 50K": "Under $50K",
+    "50K to 200K": "$50K - $200K",
+    "200K to 1M": "$200K - $1M", 
+    "Over 1M": "Over $1M"
   };
   return rangeMap[fundingRange] || "Not specified";
 };
