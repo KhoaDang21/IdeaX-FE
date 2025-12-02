@@ -353,7 +353,6 @@ const StartupDashboard: FC = () => {
               <ProjectsByStageChart
                 stats={stats}
                 fundingStageData={fundingStageData}
-                fundingColumnConfig={{}} // Config mặc định
               />
             </Col>
           </Row>

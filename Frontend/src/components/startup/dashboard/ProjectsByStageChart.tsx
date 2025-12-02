@@ -1,16 +1,16 @@
 import type { FC } from "react";
 import { Card, Row, Col, Button, Empty } from "antd";
-import { Column } from "@ant-design/charts";
+// Đã xóa import Column từ @ant-design/charts
 import { PlusOutlined } from "@ant-design/icons";
 import type { DashboardStats } from "../../../interfaces/startup/dashboard";
 
 interface Props {
   stats: DashboardStats;
   fundingStageData: any[];
-  fundingColumnConfig: any;
+  // Đã xóa fundingColumnConfig vì không còn dùng biểu đồ
 }
 
-// 1. Định nghĩa bảng màu cố định để đồng nhất giữa Chart và Legend
+// 1. Giữ nguyên bảng màu để dùng cho phần thống kê chi tiết
 const STAGE_COLOR_MAP: Record<string, string> = {
   Idea: "#8B5CF6", // Violet
   Seed: "#3B82F6", // Blue
@@ -25,53 +25,8 @@ const STAGE_COLOR_MAP: Record<string, string> = {
 export const ProjectsByStageChart: FC<Props> = ({
   stats,
   fundingStageData,
-  fundingColumnConfig,
 }) => {
-  // 2. Cấu hình lại biểu đồ để đẹp hơn và có Animation
-  const refinedConfig = {
-    ...fundingColumnConfig,
-    data: fundingStageData,
-    xField: "stage",
-    yField: "count",
-    // Màu sắc lấy từ map phía trên
-    color: ({ stage }: any) =>
-      STAGE_COLOR_MAP[stage] || STAGE_COLOR_MAP.default,
-    // Style cho cột: bo góc và độ rộng vừa phải
-    columnStyle: {
-      radius: [6, 6, 0, 0],
-      cursor: "pointer",
-    },
-    maxColumnWidth: 40,
-    // Animation: Hiệu ứng mọc lên
-    animation: {
-      appear: {
-        animation: "scale-in-y",
-        duration: 1000,
-      },
-    },
-    // Tooltip tùy chỉnh cho đẹp hơn
-    tooltip: {
-      showMarkers: false,
-      domStyles: {
-        "g2-tooltip": {
-          borderRadius: "8px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          border: "none",
-        },
-      },
-    },
-    // Tắt trục lưới ngang nhìn cho thoáng (tùy chọn)
-    yAxis: {
-      grid: {
-        line: {
-          style: {
-            lineDash: [4, 4],
-            stroke: "#e5e7eb",
-          },
-        },
-      },
-    },
-  };
+  // Đã xóa refinedConfig (cấu hình biểu đồ)
 
   return (
     <Card
@@ -103,12 +58,10 @@ export const ProjectsByStageChart: FC<Props> = ({
     >
       {fundingStageData.length > 0 ? (
         <>
-          {/* KHU VỰC BIỂU ĐỒ */}
-          <div style={{ height: 320, marginBottom: 32 }}>
-            <Column {...refinedConfig} />
-          </div>
+          {/* ĐÃ XÓA KHU VỰC BIỂU ĐỒ */}
 
-          {/* KHU VỰC THỐNG KÊ CHI TIẾT (LEGEND) */}
+          {/* KHU VỰC THỐNG KÊ CHI TIẾT (Giữ nguyên) */}
+          {/* Bỏ margin-top hoặc điều chỉnh padding nếu cần thiết vì không còn chart ở trên */}
           <div
             style={{
               background: "#fafafa",
@@ -155,7 +108,7 @@ export const ProjectsByStageChart: FC<Props> = ({
                         transition: "all 0.3s",
                         cursor: "default",
                       }}
-                      // Hiệu ứng hover nhẹ bằng CSS inline (hoặc dùng class)
+                      // Hiệu ứng hover nhẹ bằng CSS inline
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.boxShadow = `0 4px 12px ${color}20`;
