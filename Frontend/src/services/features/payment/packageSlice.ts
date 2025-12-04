@@ -18,9 +18,11 @@ export const fetchPackages = createAsyncThunk(
   'packages/fetchAll',
   async (_, thunkAPI) => {
     try {
-      return await paymentService.fetchActivePackages(); //
+      const data = await paymentService.fetchActivePackages();
+      return data;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch packages';
+      return thunkAPI.rejectWithValue(errorMessage);
     }
   }
 );
