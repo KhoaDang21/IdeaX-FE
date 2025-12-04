@@ -9,6 +9,7 @@ import {
   Typography,
   Select,
   Button,
+  Input,
 } from "antd";
 import {
   ArrowUpOutlined,
@@ -17,6 +18,8 @@ import {
   WalletOutlined,
   BankOutlined,
   RiseOutlined,
+  FileTextOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { api } from "../../services/constant/axiosInstance";
@@ -24,6 +27,7 @@ import dayjs from "dayjs";
 
 const { Title } = Typography;
 const { Option } = Select;
+const { Search } = Input;
 
 // --- Interfaces ---
 interface FinancialStats {
@@ -40,6 +44,11 @@ interface Transaction {
   type: string;
   status: string;
   createdAt: string;
+  // User Info fields
+  accountId: number;
+  accountEmail: string;
+  accountName: string;
+  accountRole: string; // [NEW] Thêm trường Role
 }
 
 const FinancialManagement: React.FC = () => {
@@ -47,6 +56,7 @@ const FinancialManagement: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState<string | undefined>(undefined);
+  const [searchText, setSearchText] = useState<string>("");
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -58,6 +68,7 @@ const FinancialManagement: React.FC = () => {
     fetchTransactions(1);
   }, []);
 
+  // Gọi lại API khi filter loại giao dịch thay đổi
   useEffect(() => {
     fetchTransactions(1);
   }, [filterType]);
@@ -80,6 +91,7 @@ const FinancialManagement: React.FC = () => {
         sort: "createdAt,desc",
       };
       if (filterType) params.type = filterType;
+      if (searchText) params.search = searchText.trim();
 
       const res = await api.get("/api/admin/financial/transactions", {
         params,
@@ -97,6 +109,32 @@ const FinancialManagement: React.FC = () => {
     }
   };
 
+  const onSearch = (value: string) => {
+    setSearchText(value);
+    // Gọi trực tiếp với page 1 để đảm bảo logic search được áp dụng ngay
+    setLoading(true);
+    const params: any = {
+      page: 0,
+      size: pagination.pageSize,
+      sort: "createdAt,desc",
+    };
+    if (filterType) params.type = filterType;
+    if (value) params.search = value.trim();
+
+    api
+      .get("/api/admin/financial/transactions", { params })
+      .then((res) => {
+        setTransactions(res.data.content);
+        setPagination({
+          ...pagination,
+          current: 1,
+          total: res.data.totalElements,
+        });
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("vi-VN", {
       style: "currency",
@@ -104,12 +142,58 @@ const FinancialManagement: React.FC = () => {
     }).format(val);
 
   const columns: ColumnsType<Transaction> = [
+    // 1. Cột Số thứ tự (STT)
     {
-      title: "ID",
-      dataIndex: "id",
-      key: "id",
-      width: 70,
+      title: "STT",
+      key: "stt",
+      width: 60,
+      align: "center",
+      render: (_text, _record, index) => {
+        return (pagination.current - 1) * pagination.pageSize + index + 1;
+      },
     },
+    // 2. Cột User Info (Email ưu tiên)
+    {
+      title: "User Info",
+      key: "user",
+      width: 280,
+      render: (_, record) => (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontWeight: "bold", color: "#1890ff", fontSize: 14 }}>
+            {record.accountEmail}
+          </span>
+          <span style={{ fontSize: 12, color: "#888" }}>
+            {record.accountName && record.accountName !== "N/A"
+              ? record.accountName
+              : "No Name"}{" "}
+            <span style={{ marginLeft: 4, opacity: 0.7 }}>
+              (ID: {record.accountId})
+            </span>
+          </span>
+        </div>
+      ),
+    },
+    // 3. [NEW] Cột Role
+    {
+      title: "Role",
+      dataIndex: "accountRole",
+      key: "accountRole",
+      width: 200,
+      render: (role) => {
+        let color = "default";
+        // Màu sắc phân biệt các vai trò
+        if (role === "INVESTOR") color = "geekblue";
+        if (role === "START_UP") color = "green";
+        if (role === "ADMIN") color = "red";
+
+        return (
+          <Tag color={color} style={{ fontWeight: 600 }}>
+            {role ? role.replace("_", " ") : "USER"}
+          </Tag>
+        );
+      },
+    },
+    // 4. Cột Type Transaction
     {
       title: "Type",
       dataIndex: "type",
@@ -117,21 +201,38 @@ const FinancialManagement: React.FC = () => {
       render: (type) => {
         let color = "default";
         let icon = null;
-        if (type === "DEPOSIT") {
-          color = "success";
-          icon = <ArrowUpOutlined />;
-        }
-        if (type === "WITHDRAW") {
-          color = "warning";
-          icon = <ArrowDownOutlined />;
-        }
-        if (type === "PROJECT_UPGRADE") {
-          color = "processing";
-          icon = <RiseOutlined />;
-        }
-        if (type === "PROJECT_PAYMENT") {
-          color = "purple";
-          icon = <DollarOutlined />;
+
+        switch (type) {
+          case "DEPOSIT":
+            color = "success";
+            icon = <ArrowUpOutlined />;
+            break;
+          case "WITHDRAW":
+            color = "error";
+            icon = <ArrowDownOutlined />;
+            break;
+          case "PROJECT_UPGRADE":
+            color = "blue";
+            icon = <RiseOutlined />;
+            break;
+          case "NDA_FEE":
+            color = "geekblue";
+            icon = <FileTextOutlined />;
+            break;
+          case "PROJECT_PAYMENT":
+            color = "purple";
+            icon = <DollarOutlined />;
+            break;
+          case "PAYMENT_RELEASE":
+            color = "cyan";
+            icon = <CheckCircleOutlined />;
+            break;
+          case "PAYMENT_REFUND":
+            color = "orange";
+            icon = <ArrowUpOutlined />;
+            break;
+          default:
+            color = "default";
         }
 
         return (
@@ -142,6 +243,7 @@ const FinancialManagement: React.FC = () => {
         );
       },
     },
+    // 5. Cột Amount
     {
       title: "Amount",
       dataIndex: "amount",
@@ -163,6 +265,7 @@ const FinancialManagement: React.FC = () => {
         );
       },
     },
+    // 6. Cột Status
     {
       title: "Status",
       dataIndex: "status",
@@ -181,6 +284,7 @@ const FinancialManagement: React.FC = () => {
         </Tag>
       ),
     },
+    // 7. Cột Date
     {
       title: "Date",
       dataIndex: "createdAt",
@@ -197,7 +301,6 @@ const FinancialManagement: React.FC = () => {
 
       {/* --- STATS CARDS --- */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {/* Doanh Thu */}
         <Col xs={24} sm={12} lg={6}>
           <Card
             bordered={false}
@@ -211,10 +314,12 @@ const FinancialManagement: React.FC = () => {
               prefix={<DollarOutlined />}
               formatter={(val) => formatCurrency(Number(val))}
             />
+            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+              Includes Upgrade Packs & NDA Fees
+            </div>
           </Card>
         </Col>
 
-        {/* Tiền Nạp */}
         <Col xs={24} sm={12} lg={6}>
           <Card
             bordered={false}
@@ -231,7 +336,6 @@ const FinancialManagement: React.FC = () => {
           </Card>
         </Col>
 
-        {/* Tiền Rút */}
         <Col xs={24} sm={12} lg={6}>
           <Card
             bordered={false}
@@ -248,7 +352,6 @@ const FinancialManagement: React.FC = () => {
           </Card>
         </Col>
 
-        {/* Tiền Đầu Tư */}
         <Col xs={24} sm={12} lg={6}>
           <Card
             bordered={false}
@@ -265,7 +368,6 @@ const FinancialManagement: React.FC = () => {
           </Card>
         </Col>
 
-        {/* Tổng số dư ví hệ thống (Hiển thị riêng cho nổi bật) */}
         <Col span={24}>
           <Card
             style={{
@@ -312,9 +414,21 @@ const FinancialManagement: React.FC = () => {
             marginBottom: 16,
             display: "flex",
             gap: 16,
+            alignItems: "center",
             flexWrap: "wrap",
           }}
         >
+          {/* Thanh Search */}
+          <Search
+            placeholder="Search by Email, Investor or Startup Name"
+            allowClear
+            onSearch={onSearch}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ width: 350 }}
+            enterButton
+          />
+
+          {/* Thanh Filter Type */}
           <Select
             placeholder="Filter by Transaction Type"
             style={{ width: 250 }}
@@ -324,8 +438,11 @@ const FinancialManagement: React.FC = () => {
             <Option value="DEPOSIT">Deposit (Nạp tiền)</Option>
             <Option value="WITHDRAW">Withdraw (Rút tiền)</Option>
             <Option value="PROJECT_UPGRADE">Project Upgrade (Mua gói)</Option>
+            <Option value="NDA_FEE">NDA Fee (Phí bảo mật)</Option>
             <Option value="PROJECT_PAYMENT">Investment (Đầu tư)</Option>
+            <Option value="PAYMENT_RELEASE">Release (Giải ngân)</Option>
           </Select>
+
           <Button type="primary" onClick={() => fetchTransactions(1)}>
             Refresh Data
           </Button>
