@@ -33,7 +33,11 @@ export const UpgradeModal: React.FC<Props> = ({ open, onClose }) => {
 
   useEffect(() => {
     if (open) {
-      dispatch(fetchPackages());
+      dispatch(fetchPackages())
+        .unwrap()
+        .catch(() => {
+          message.error('Failed to load packages. Please try again.');
+        });
       dispatch(getMyWallet());
     }
   }, [open, dispatch]);
