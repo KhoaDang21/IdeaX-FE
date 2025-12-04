@@ -3,20 +3,21 @@ import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Row, Col } from "antd";
 import type { RootState, AppDispatch } from "../../store";
-// Import thêm getMilestonesByProject và kiểu Milestone
 import {
   getMyProjects,
   getMilestonesByProject,
 } from "../../services/features/project/projectSlice";
+// ✅ Import thêm action fetchMeetings để lấy dữ liệu meeting/hợp đồng
+import { fetchMeetings } from "../../services/features/meeting/meetingSlice";
+
 import type { Project as ApiProject } from "../../interfaces/project";
-import type { Milestone as ApiMilestone } from "../../interfaces/milestone"; // <-- Import kiểu Milestone
+import type { Milestone as ApiMilestone } from "../../interfaces/milestone";
 import type {
   DashboardStats,
   Activity,
   ProjectMilestone,
 } from "../../interfaces/startup/dashboard";
 
-// Import child components
 import { DashboardStatsGrid } from "../../components/startup/dashboard/DashboardStatsGrid";
 import { FundingTrendsChart } from "../../components/startup/dashboard/FundingTrendsChart";
 import { ProjectsByStageChart } from "../../components/startup/dashboard/ProjectsByStageChart";
@@ -24,7 +25,6 @@ import { ProjectMilestonesList } from "../../components/startup/dashboard/Projec
 import { RecentActivityList } from "../../components/startup/dashboard/RecentActivityList";
 import { AllActivitiesModal } from "../../components/startup/dashboard/AllActivitiesModal";
 
-// Define a proper initial state for DashboardStats
 const initialStats: DashboardStats = {
   totalProjects: 0,
   fundingRaised: 0,
@@ -35,30 +35,29 @@ const initialStats: DashboardStats = {
 
 const StartupDashboard: FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  // Lấy cả projects và milestones từ Redux state
   const { projects: apiProjects, milestones: apiMilestones } = useSelector(
     (state: RootState) => state.project
   );
+  // ✅ Lấy state meeting từ Redux
+  const { meetings } = useSelector((state: RootState) => state.meeting);
 
-  // --- Component States ---
   const [stats, setStats] = useState<DashboardStats>(initialStats);
   const [allActivities, setAllActivities] = useState<Activity[]>([]);
-  // State này lưu trữ milestones đã map cho UI
   const [displayMilestones, setDisplayMilestones] = useState<
     ProjectMilestone[]
   >([]);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<string>("6m");
   const [fundingStageData, setFundingStageData] = useState<any[]>([]);
-  const [monthlyTrends, setMonthlyTrends] = useState<any[]>([]);
+
+  // ✅ Đổi state này để chứa dữ liệu so sánh Target vs Raised
+  const [fundingProgressData, setFundingProgressData] = useState<any[]>([]);
   const [isActivityModalVisible, setIsActivityModalVisible] = useState(false);
 
-  // --- Helper Functions ---
   const formatCurrency = (amount: number): string => {
     if (amount === 0) return "$0";
-    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-    if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
-    return `$${amount}`;
+    if (amount >= 1000000000) return `${(amount / 1000000000).toFixed(1)}B`; // Tỷ
+    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`; // Triệu
+    return `${amount.toLocaleString()}`;
   };
 
   const formatTimeAgo = (date: Date): string => {
@@ -95,38 +94,49 @@ const StartupDashboard: FC = () => {
     IPO: "#6b7280",
   };
 
-  const calculateStats = (projects: ApiProject[]): DashboardStats => {
+  // ✅ CẬP NHẬT LOGIC TÍNH TOÁN STATS
+  const calculateStats = (
+    projects: ApiProject[],
+    meetingList: any[]
+  ): DashboardStats => {
     const totalProjects = projects.length;
+
+    // 1. Funding Raised: Tổng tiền thực nhận (fundingReceived)
     const fundingRaised = projects.reduce(
-      (sum, p) => sum + (p.fundingAmount || 0),
+      (sum, p) => sum + ((p as any).fundingReceived || 0), // cast any để tránh lỗi TS nếu thiếu type
       0
     );
-    const interestedInvestors = projects.reduce(
-      (sum, p) => sum + (p.investorClicks || 0),
-      0
-    );
-    const avgInvestorEngagement =
-      totalProjects > 0 ? Math.round(interestedInvestors / totalProjects) : 0;
-    const growthRate =
-      totalProjects > 0
-        ? Math.round(interestedInvestors / totalProjects / 10)
-        : 0; // Simple example
+
+    // 2. Interested Investors (Avg. per Project cũ): Số người tạo Meeting Rooms
+    // Sử dụng Set để đếm unique investor ID
+    const uniqueMeetingInvestors = new Set(
+      meetingList.map((m) => m.createdById)
+    ).size;
+
+    // 3. Investor Engagement: Số người đã KÝ HỢP ĐỒNG (FULLY_SIGNED)
+    const uniqueSignedInvestors = new Set(
+      meetingList
+        .filter((m) => m.contractStatus === "FULLY_SIGNED")
+        .map((m) => m.createdById)
+    ).size;
+
+    // Growth rate (giả lập hoặc tính dựa trên funding recent)
+    const growthRate = totalProjects > 0 ? 12 : 0;
+
     return {
       totalProjects,
       fundingRaised,
-      interestedInvestors,
-      avgInvestorEngagement,
+      interestedInvestors: uniqueSignedInvestors, // Hiển thị ở ô Investor Engagement
+      avgInvestorEngagement: uniqueMeetingInvestors, // Hiển thị ở ô Avg. Per Project (đổi tên sau)
       growthRate,
     };
   };
 
-  // --- Data Calculation Logic ---
-  // Hàm này giờ tính toán chart data, map activities, VÀ map milestones
   const calculateDisplayData = (
     projects: ApiProject[],
     milestonesData: ApiMilestone[]
   ) => {
-    // Calculate Funding Stage Distribution
+    // 1. Projects by Stage Chart
     const stageCount: { [key: string]: number } = {};
     Object.keys(fundingStageColors).forEach((stage) => {
       stageCount[stage] = 0;
@@ -149,78 +159,36 @@ const StartupDashboard: FC = () => {
     }));
     setFundingStageData(stageData);
 
-    // Calculate Monthly Trends
-    const monthlyData: {
-      [key: string]: { projects: number; investors: number; funding: number };
-    } = {};
-    const currentYear = new Date().getFullYear();
-    projects.forEach((project) => {
-      if (
-        !project.createdAt ||
-        new Date(project.createdAt).getFullYear() !== currentYear
-      )
-        return;
-      const date = new Date(project.createdAt);
-      const monthKey = date
-        .toLocaleString("en-US", { month: "short" })
-        .toUpperCase();
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { projects: 0, investors: 0, funding: 0 };
-      }
-      monthlyData[monthKey].projects += 1;
-      monthlyData[monthKey].investors += project.investorClicks || 0;
-      monthlyData[monthKey].funding += project.fundingAmount || 0;
-    });
-    const monthOrder = [
-      "JAN",
-      "FEB",
-      "MAR",
-      "APR",
-      "MAY",
-      "JUN",
-      "JUL",
-      "AUG",
-      "SEP",
-      "OCT",
-      "NOV",
-      "DEC",
-    ];
-    const trendsData = monthOrder
-      .map((month) => ({
-        month,
-        projects: monthlyData[month]?.projects || 0,
-        investors: monthlyData[month]?.investors || 0,
-        funding: monthlyData[month]?.funding || 0,
-      }))
-      .filter(
-        (item) => item.projects > 0 || item.investors > 0 || item.funding > 0
-      );
-    setMonthlyTrends(trendsData);
+    // ✅ 2. Funding Progress Chart (Thay thế Monthly Trends)
+    // So sánh Target (fundingAmount) và Raised (fundingReceived) của các dự án
+    const progressData = projects.map((p) => ({
+      name: p.projectName,
+      Goal: p.fundingAmount || 0,
+      Raised: (p as any).fundingReceived || 0,
+    }));
+    setFundingProgressData(progressData);
 
-    // --- MAP MILESTONES THỰC TẾ (Lấy từ apiMilestones từ Redux) ---
-    // Chỉ lấy milestones thuộc project đầu tiên (do hạn chế của slice hiện tại)
+    // 3. Map Milestones
     const relevantMilestones = [...milestonesData];
-    // Bạn có thể thêm logic sắp xếp ở đây, ví dụ: sắp xếp theo ngày gần nhất
     relevantMilestones.sort(
       (a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
     );
 
     const mappedMilestones: ProjectMilestone[] = relevantMilestones
-      .slice(0, 4) // Giới hạn hiển thị 4 milestones trên dashboard
+      .slice(0, 4)
       .map((m) => {
-        const project = projects.find((p) => p.id === m.projectId); // Tìm project tương ứng
+        const project = projects.find((p) => p.id === m.projectId);
         let status: "completed" | "in-progress" | "upcoming" = "upcoming";
         let progress = 0;
 
-        // Map trạng thái từ API sang trạng thái UI
         switch (m.status?.toUpperCase()) {
           case "COMPLETED":
             status = "completed";
             progress = 100;
             break;
-          case "IN_PROGRESS": // Giả sử có trạng thái này
+          case "IN_PROGRESS":
             status = "in-progress";
-            progress = 50; // Hoặc logic khác
+            progress = 50;
             break;
           case "PENDING":
           default:
@@ -228,7 +196,6 @@ const StartupDashboard: FC = () => {
             progress = 0;
             break;
         }
-        // Ghi đè thành completed nếu project đã completed
         if (project?.status === "COMPLETE" && status !== "completed") {
           status = "completed";
           progress = 100;
@@ -245,9 +212,9 @@ const StartupDashboard: FC = () => {
           progress,
         };
       });
-    setDisplayMilestones(mappedMilestones); // Cập nhật state displayMilestones
+    setDisplayMilestones(mappedMilestones);
 
-    // Load and Map Activities from localStorage
+    // 4. Map Activities
     const storedActivities = JSON.parse(
       localStorage.getItem("recentActivities") || "[]"
     ) as Array<{ action: string; projectId?: string; timestamp: number }>;
@@ -255,7 +222,6 @@ const StartupDashboard: FC = () => {
     const mappedActivities: Activity[] = storedActivities.map(
       (activity, index) => {
         const projectAct = projects.find(
-          // Đổi tên biến để tránh trùng lặp
           (p) => String(p.id) === activity.projectId
         );
         const actionLower = activity.action.toLowerCase();
@@ -296,22 +262,21 @@ const StartupDashboard: FC = () => {
     setAllActivities(mappedActivities);
   };
 
-  // --- Effects ---
   useEffect(() => {
     const loadDashboardData = async () => {
       setLoading(true);
       try {
         const projectAction = await dispatch(getMyProjects());
-        // Chỉ fetch milestones nếu lấy projects thành công VÀ có project
+        // ✅ Fetch luôn meetings
+        await dispatch(fetchMeetings());
+
         if (
           getMyProjects.fulfilled.match(projectAction) &&
           projectAction.payload.length > 0
         ) {
-          // Tạo một mảng các lời hứa (Promise) để fetch milestones cho TẤT CẢ project
           const milestonePromises = projectAction.payload.map((project) =>
             dispatch(getMilestonesByProject(project.id))
           );
-          // Chờ tất cả các lời hứa hoàn thành
           await Promise.all(milestonePromises);
         }
       } catch (error) {
@@ -323,22 +288,18 @@ const StartupDashboard: FC = () => {
     loadDashboardData();
   }, [dispatch]);
 
-  // Effect này chạy khi projects HOẶC milestones từ Redux thay đổi
   useEffect(() => {
-    // Chỉ tính toán lại khi apiProjects đã được load (không phải null/undefined)
     if (apiProjects) {
-      // Truyền apiMilestones (có thể là [] nếu chưa load xong hoặc không có)
       calculateDisplayData(apiProjects, apiMilestones || []);
-      // Tính stats dựa trên apiProjects
       if (apiProjects.length > 0) {
-        setStats(calculateStats(apiProjects));
+        // ✅ Truyền meetings vào hàm tính stats
+        setStats(calculateStats(apiProjects, meetings || []));
       } else {
-        setStats(initialStats); // Reset stats nếu không có project
+        setStats(initialStats);
       }
     }
-  }, [apiProjects, apiMilestones]); // Phụ thuộc vào cả hai
+  }, [apiProjects, apiMilestones, meetings]); // ✅ Thêm dependencies meetings
 
-  // --- Modal Handlers ---
   const handleViewAllActivities = () => {
     setIsActivityModalVisible(true);
   };
@@ -346,60 +307,6 @@ const StartupDashboard: FC = () => {
     setIsActivityModalVisible(false);
   };
 
-  // --- Chart Configurations ---
-  const areaChartConfig = {
-    data: monthlyTrends,
-    xField: "month",
-    yField: "funding",
-    smooth: true,
-    height: 120,
-    padding: "auto",
-    areaStyle: () => ({ fill: "l(270) 0:#ffffff 0.5:#764ba2 1:#667eea" }),
-    line: { color: "#667eea" },
-    tooltip: {
-      formatter: (datum: any) => ({
-        name: "Funding",
-        value: formatCurrency(datum.funding),
-      }),
-    },
-    xAxis: { line: null, tickLine: null, label: { style: { fill: "#aaa" } } },
-    yAxis: { grid: null, label: null },
-  };
-
-  const fundingColumnConfig = {
-    data: fundingStageData,
-    xField: "stage",
-    yField: "count",
-    colorField: "stage",
-    color: ({ stage }: any) => {
-      const stageKey = Object.keys(fundingStageColors).find(
-        (key) => formatFundingStage(key) === stage
-      );
-      return stageKey
-        ? fundingStageColors[stageKey as keyof typeof fundingStageColors]
-        : "#6b7280";
-    },
-    legend: false,
-    height: 350,
-    padding: "auto",
-    columnStyle: { radius: [4, 4, 0, 0] },
-    tooltip: {
-      formatter: (datum: any) => ({
-        name: datum.stage,
-        value: `${datum.count} projects`,
-      }),
-    },
-    xAxis: {
-      label: { autoHide: true, autoRotate: false, style: { fontSize: 11 } },
-      title: { text: "Funding Stage", style: { fontSize: 12 } },
-    },
-    yAxis: {
-      title: { text: "Number of Projects", style: { fontSize: 12 } },
-      grid: { line: { style: { stroke: "#eee" } } },
-    },
-  };
-
-  // --- Render Logic ---
   if (loading) {
     return (
       <div
@@ -418,7 +325,6 @@ const StartupDashboard: FC = () => {
 
   return (
     <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
-      {/* Header Section */}
       <div style={{ marginBottom: 24 }}>
         <h1
           style={{ fontSize: 28, fontWeight: 700, color: "#1f2937", margin: 0 }}
@@ -430,21 +336,16 @@ const StartupDashboard: FC = () => {
         </p>
       </div>
 
-      {/* Stats Grid Component */}
       <DashboardStatsGrid stats={stats} formatCurrency={formatCurrency} />
 
-      {/* Main Content Area */}
       <Row gutter={[24, 24]}>
-        {/* Left Column */}
         <Col xs={24} xl={16}>
           <Row gutter={[16, 16]}>
             <Col xs={24}>
+              {/* ✅ Sử dụng biểu đồ mới */}
               <FundingTrendsChart
                 stats={stats}
-                monthlyTrends={monthlyTrends}
-                timeRange={timeRange}
-                setTimeRange={setTimeRange}
-                areaChartConfig={areaChartConfig}
+                data={fundingProgressData} // Data mới
                 formatCurrency={formatCurrency}
               />
             </Col>
@@ -452,17 +353,14 @@ const StartupDashboard: FC = () => {
               <ProjectsByStageChart
                 stats={stats}
                 fundingStageData={fundingStageData}
-                fundingColumnConfig={fundingColumnConfig}
               />
             </Col>
           </Row>
         </Col>
 
-        {/* Right Column */}
         <Col xs={24} xl={8}>
           <Row gutter={[16, 16]}>
             <Col xs={24}>
-              {/* Truyền displayMilestones đã được map từ state */}
               <ProjectMilestonesList milestones={displayMilestones} />
             </Col>
             <Col xs={24}>
@@ -475,7 +373,6 @@ const StartupDashboard: FC = () => {
         </Col>
       </Row>
 
-      {/* Modal for All Activities */}
       <AllActivitiesModal
         visible={isActivityModalVisible}
         activities={allActivities}

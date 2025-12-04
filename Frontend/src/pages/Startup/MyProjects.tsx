@@ -39,6 +39,37 @@ const formatCurrency = (amount: number): string => {
   return `$${amount}`;
 };
 
+// Helper hiển thị Funding Range đẹp hơn
+const getFundingRangeDisplay = (fundingRange: string): string => {
+  if (!fundingRange) return "Not specified";
+
+  const rangeMap: { [key: string]: string } = {
+    // Enum keys
+    UNDER_50K: "Under $50K",
+    FROM_50K_TO_200K: "$50K - $200K",
+    FROM_200K_TO_1M: "$200K - $1M",
+    OVER_1M: "Over $1M",
+
+    // Text values from API (fallback)
+    "Under 50K": "Under $50K",
+    "50K to 200K": "$50K - $200K",
+    "200K to 1M": "$200K - $1M",
+    "Over 1M": "Over $1M",
+  };
+
+  return rangeMap[fundingRange] || fundingRange;
+};
+
+// Helper tính phần trăm Funding (Raised / Target)
+const getFundingPercentage = (
+  received: number = 0,
+  goal: number = 0
+): number => {
+  if (!goal || goal === 0) return 0;
+  const percent = (received / goal) * 100;
+  return Math.min(Math.round(percent), 100);
+};
+
 const generateTimeline = (project: ApiProject): ProjectUI["timeline"] => {
   const stages = ["Initial Review", "Contract Signing", "Funding Completion"];
   return stages.map((stage) => {
@@ -69,19 +100,6 @@ const generateTimeline = (project: ApiProject): ProjectUI["timeline"] => {
     }
     return { stage, date, status };
   });
-};
-
-const calculateProgressFromTimeline = (
-  timeline: ProjectUI["timeline"]
-): number => {
-  const completedStages = timeline.filter(
-    (s) => s.status === "completed"
-  ).length;
-  const inProgressStages = timeline.filter(
-    (s) => s.status === "in-progress"
-  ).length;
-  const progress = completedStages * 33.33 + inProgressStages * 16.67;
-  return Math.min(Math.round(progress), 100);
 };
 
 const calculateCompletionFromTimeline = (
@@ -119,7 +137,6 @@ const MyProjects: React.FC = () => {
 
   // --- TÍNH TOÁN GIỚI HẠN DỰ ÁN ---
   const currentProjectCount = apiProjects?.length || 0;
-  // Mặc định là 0 hoặc lấy từ user nếu đã load xong
   const projectLimit = user?.projectLimit || 0;
 
   // Tính toán danh sách projects UI
@@ -128,7 +145,12 @@ const MyProjects: React.FC = () => {
     return apiProjects.map((project) => {
       const timeline = generateTimeline(project);
       const completion = calculateCompletionFromTimeline(timeline);
-      const progress = calculateProgressFromTimeline(timeline);
+
+      // ✅ [LOGIC MỚI] Tính % dựa trên tiền (Raised / Target)
+      const fundingProgress = getFundingPercentage(
+        (project as any).fundingReceived || 0,
+        project.fundingAmount || 0
+      );
 
       let stageName = "Initial Review";
       const order: Record<string, number> = {
@@ -161,9 +183,14 @@ const MyProjects: React.FC = () => {
         id: project.id,
         title: project.projectName || "Untitled Project",
         status: project.status || "Unknown",
-        progress,
+
+        progress: fundingProgress, // ✅ Gán % tiền vào đây
+
+        // ✅ Format hiển thị tiền và range
         raised: formatCurrency((project as any).fundingReceived || 0),
         target: formatCurrency(project.fundingAmount || 0),
+        fundingRangeDisplay: getFundingRangeDisplay(project.fundingRange),
+
         stage,
         timeline,
         milestones: [],
@@ -359,7 +386,6 @@ const MyProjects: React.FC = () => {
 
   return (
     <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
-      {/* Luôn hiển thị Header để thấy thông tin Limit và nút Buy */}
       <ProjectPageHeader
         onNewProject={handleNewProject}
         onBuyMore={handleBuyMore}

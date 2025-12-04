@@ -1,33 +1,68 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  Modal,
-  Form,
-  InputNumber,
-  Select,
-  Input,
-  message,
+  Button,
+  Card,
+  Col,
   Empty,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Row,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  message,
 } from "antd";
-import InlineLoading from '../../components/InlineLoading'
+import { ArrowUpOutlined, ArrowDownOutlined } from "@ant-design/icons";
+import InlineLoading from "../../components/InlineLoading";
+import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import dayjs from "dayjs";
 
-// Import từ store của bạn
 import type { RootState, AppDispatch } from "../../store";
 import {
-  // --- SỬA ĐỔI IMPORT: Bỏ MoMo/ZaloPay, chỉ giữ createDeposit ---
   createDeposit,
   createWithdraw,
   getMyWallet,
   getTransactionHistory,
 } from "../../services/features/payment/paymentSlice";
 
-// --- Helper Functions ---
+// ✅ 1. IMPORT INTERFACE CHÍNH THỨC (Thay vì tự định nghĩa lại gây lỗi)
+import type { TransactionResponse } from "../../interfaces/payment";
+
+const { Title, Text } = Typography;
+
+// --- Helper Functions & Constants ---
+const statusColor: Record<string, string> = {
+  PENDING: "gold",
+  SUCCESS: "green",
+  COMPLETED: "green",
+  RELEASED: "blue",
+  REFUNDED: "volcano",
+  FAILED: "red",
+  REJECTED: "red",
+};
+
+const formatNumberInput = (value?: string | number) => {
+  if (value === undefined || value === null) return "";
+  const stringified = typeof value === "number" ? value.toString() : value;
+  return stringified.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
+const parseNumberInput = (value?: string) => {
+  if (!value) return 0;
+  const numeric = Number(value.replace(/,/g, ""));
+  return Number.isNaN(numeric) ? 0 : numeric;
+};
+
 const formatCurrency = (value?: string | number) => {
   if (value === undefined || value === null) return "-";
   const numeric = typeof value === "string" ? Number(value) : value;
+  if (Number.isNaN(numeric)) return "-";
   return new Intl.NumberFormat("en-US", {
-    // Display using English locale formatting but currency is VND
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
@@ -41,404 +76,579 @@ const formatDateTime = (value?: string) => {
 
 const Payment: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-
-  const { wallet, transactions, status } = useSelector(
-    // Thêm 'status'
+  const { wallet, transactions, transactionsPage, status } = useSelector(
     (state: RootState) => state.payment
   );
 
-  const totals = React.useMemo(() => {
-    let totalDeposits = 0;
-    let totalInvested = 0;
-    if (!transactions || transactions.length === 0) return { totalDeposits, totalInvested };
-    for (const t of transactions) {
-      const amt = Number(t.amount ?? 0);
-      if (t.type === "DEPOSIT" && t.status === "SUCCESS") totalDeposits += amt;
-      if (t.type === "PROJECT_PAYMENT") {
-        if (t.status === "REFUNDED") continue;
-        totalInvested += Math.abs(amt);
-      }
-    }
-    return { totalDeposits, totalInvested };
-  }, [transactions]);
-
+  const [initializing, setInitializing] = useState(true);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
-  // Bỏ 'loading' state, dùng 'status' từ slice
-  // const [loading, setLoading] = useState(false);
 
   const [depositForm] = Form.useForm();
   const [withdrawForm] = Form.useForm();
 
-  const fetchData = useCallback(async () => {
-    // setLoading(true); // Không cần state loading riêng
-    try {
-      await Promise.all([
-        dispatch(getMyWallet()).unwrap(),
-        dispatch(getTransactionHistory({ page: 0, size: 20 })).unwrap(),
-      ]);
-    } catch (error: any) {
-      // Hiển thị lỗi nếu cần, nhưng slice đã lưu lỗi
-      console.error("Failed to fetch payment data:", error.message);
-    }
-    // finally {
-    //   setLoading(false);
-    // }
-  }, [dispatch]);
+  // Pagination states
+  const [transactionPage, setTransactionPage] = useState(1);
+  const [transactionPageSize, setTransactionPageSize] = useState(10);
+
+  // --- Fetch Data ---
+  const fetchData = useCallback(
+    async (page: number, size: number) => {
+      try {
+        await Promise.all([
+          dispatch(getMyWallet()).unwrap(),
+          dispatch(
+            getTransactionHistory({ page: Math.max(page - 1, 0), size })
+          ).unwrap(),
+        ]);
+      } catch (error: any) {
+        console.error("Failed to fetch payment data:", error);
+      }
+    },
+    [dispatch]
+  );
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const init = async () => {
+      setInitializing(true);
+      await fetchData(1, transactionPageSize);
+      setInitializing(false);
+    };
+    init();
+  }, [fetchData, transactionPageSize]);
 
-  // --- SỬA HÀM NẠP TIỀN ---
+  const handleTableChange = (pagination: TablePaginationConfig) => {
+    const newPage = pagination.current ?? 1;
+    const newSize = pagination.pageSize ?? transactionPageSize;
+    setTransactionPage(newPage);
+    setTransactionPageSize(newSize);
+    void fetchData(newPage, newSize);
+  };
+
+  // --- Actions ---
   const handleDepositSubmit = async () => {
     try {
       const values = await depositForm.validateFields();
       const amount = Number(values.amount);
-      const method = "PAYOS";
-
-      // Gọi một thunk 'createDeposit' duy nhất với mặc định PayOS
       const res = await dispatch(
-        createDeposit({ amount, paymentMethod: method })
+        createDeposit({ amount, paymentMethod: "PAYOS" })
       ).unwrap();
 
-      message.success("Deposit request created successfully!");
-
-      // Backend trả về redirectUrl hoặc paymentUrl
+      message.success("Deposit request created. Redirecting...");
       const url = res.redirectUrl || res.paymentUrl;
       if (url) {
-        window.location.href = url; // Điều hướng trực tiếp tới PayOS
+        window.location.href = url;
       }
-
       setDepositModalOpen(false);
       depositForm.resetFields();
-      fetchData(); // Tải lại data
     } catch (err: any) {
-      message.error(err.message || "Error during deposit");
+      message.error(err.message || "Failed to create deposit request");
     }
   };
-  // --- KẾT THÚC SỬA ---
 
   const handleWithdrawSubmit = async () => {
     try {
       const values = await withdrawForm.validateFields();
+      const balance = Number(wallet?.balance ?? 0);
+      const amount = Number(values.amount ?? 0);
+
+      if (amount > balance) {
+        message.error("Insufficient balance");
+        return;
+      }
+
       await dispatch(
         createWithdraw({
-          amount: Number(values.amount),
+          amount,
           bankName: values.bankName,
           bankAccountNumber: values.bankAccountNumber,
           accountHolderName: values.accountHolderName,
         })
       ).unwrap();
 
-      message.success("Withdrawal request submitted successfully!");
+      message.success("Withdraw request created");
       setWithdrawModalOpen(false);
       withdrawForm.resetFields();
-      fetchData(); // Tải lại data
+      fetchData(1, transactionPageSize);
     } catch (err: any) {
-      message.error(err.message || "Error during withdrawal");
+      message.error(err.message || "Failed to create withdraw request");
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const map: Record<string, string> = {
-      PENDING: "#d97706",
-      SUCCESS: "#16a34a",
-      COMPLETED: "#16a34a",
-      FAILED: "#dc2626",
-      REJECTED: "#dc2626",
-      REFUNDED: "#7c3aed",
-      // Thêm các loại giao dịch mới
-      PROJECT_UPGRADE: "#0ea5e9",
-      PROJECT_PAYMENT: "#ef4444",
-      PAYMENT_RELEASE: "#16a34a",
-    };
-    return map[status] || "#64748b";
-  };
+  // --- Calculations ---
+  const totals = useMemo(() => {
+    let totalDeposits = 0;
+    let totalReceived = 0; // Thay cho Total Invested
+    let pendingWithdrawals = 0;
 
-  const getStatusBg = (status: string) => {
-    const map: Record<string, string> = {
-      PENDING: "#fefce8",
-      SUCCESS: "#dcfce7",
-      COMPLETED: "#dcfce7",
-      FAILED: "#fee2e2",
-      REJECTED: "#fee2e2",
-      REFUNDED: "#ede9fe",
-      // Thêm các loại giao dịch mới
-      PROJECT_UPGRADE: "#f0f9ff",
-      PROJECT_PAYMENT: "#fee2e2",
-      PAYMENT_RELEASE: "#dcfce7",
-    };
-    return map[status] || "#f1f5f9";
-  };
+    if (!transactions || transactions.length === 0)
+      return { totalDeposits, totalReceived, pendingWithdrawals };
 
-  const getAmountColor = (type: string, amount: number | string) => {
-    const numAmount = Number(amount);
-    if (
-      type === "DEPOSIT" ||
-      type === "PAYMENT_RELEASE" ||
-      type === "REFUNDED"
-    ) {
-      return "#16a34a"; // Màu xanh cho tiền vào
-    }
-    if (numAmount < 0) {
-      return "#dc2626"; // Màu đỏ cho tiền ra (nếu BE trả số âm)
-    }
-    // Mặc định (cho WITHDRAW, PROJECT_PAYMENT, PROJECT_UPGRADE)
-    return "#0f172a";
-  };
+    for (const t of transactions) {
+      // ✅ 2. ÉP KIỂU SANG NUMBER VÌ INTERFACE LÀ STRING
+      const amt = Number(t.amount ?? 0);
+      const abs = Math.abs(amt);
 
-  const getAmountPrefix = (type: string, amount: number | string) => {
-    const numAmount = Number(amount);
-    if (
-      type === "DEPOSIT" ||
-      type === "PAYMENT_RELEASE" ||
-      type === "REFUNDED"
-    ) {
-      return "+";
-    }
-    if (numAmount < 0) {
-      return ""; // Số tiền đã có dấu âm
-    }
-    return "-"; // Mặc định trừ
-  };
+      // Tính tổng tiền nạp
+      if (t.type === "DEPOSIT" && t.status === "SUCCESS") {
+        totalDeposits += abs;
+      }
 
-  return (
-    <div style={{ padding: 24, background: "#f9fafb", minHeight: "100vh" }}>
-      {/* --- Header & Actions --- */}
+      // Tính tổng tiền NHẬN ĐƯỢC từ Investor (giải ngân)
+      // PAYMENT_RELEASE là tiền cộng vào ví startup
+      if (t.type === "PAYMENT_RELEASE" && t.status === "SUCCESS") {
+        totalReceived += abs;
+      }
+
+      // Tính tiền đang chờ rút
+      if (t.type === "WITHDRAW" && t.status === "PENDING") {
+        pendingWithdrawals += abs;
+      }
+    }
+    return { totalDeposits, totalReceived, pendingWithdrawals };
+  }, [transactions]);
+
+  const availableForWithdrawal = useMemo(() => {
+    return Number(wallet?.balance ?? 0);
+  }, [wallet]);
+
+  // --- Render Sections ---
+  const columns: ColumnsType<TransactionResponse> = [
+    {
+      title: "Time",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      render: (value: string) => formatDateTime(value),
+    },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
+      render: (value: string) => {
+        const typeColors: Record<string, string> = {
+          DEPOSIT: "blue",
+          WITHDRAW: "orange",
+          PROJECT_PAYMENT: "purple", // Tiền từ investor
+          PAYMENT_RELEASE: "green", // Tiền nhận được (quan trọng với startup)
+          PAYMENT_REFUND: "volcano",
+          PROJECT_UPGRADE: "cyan",
+        };
+        // Hiển thị tên thân thiện hơn
+        let label = value;
+        if (value === "PAYMENT_RELEASE") label = "RECEIVED FUND";
+        if (value === "PROJECT_UPGRADE") label = "PACKAGE UPGRADE";
+
+        return <Tag color={typeColors[value] || "default"}>{label}</Tag>;
+      },
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      key: "amount",
+      // ✅ 3. SỬA RENDER ĐỂ NHẬN CẢ STRING HOẶC NUMBER
+      render: (value: number | string) => {
+        const num = Number(value);
+        // Tô màu: Dương (Xanh), Âm (Đỏ)
+        const color = num >= 0 ? "#3f8600" : "#cf1322";
+        const prefix = num > 0 ? "+" : "";
+        return (
+          <span style={{ color, fontWeight: 600 }}>
+            {prefix}
+            {formatCurrency(num)}
+          </span>
+        );
+      },
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (value: string) => (
+        <Tag color={statusColor[value] ?? "default"}>{value}</Tag>
+      ),
+    },
+  ];
+
+  const renderWalletSummary = () => (
+    <div>
+      <div
+        style={{
+          background: "white",
+          padding: "20px 24px",
+          borderRadius: 12,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          marginBottom: 16,
+        }}
+      >
+        <Row align="middle" justify="space-between">
+          <Col>
+            <Title
+              level={3}
+              style={{
+                margin: 0,
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", // Green theme for Startup logic
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                fontWeight: 700,
+              }}
+            >
+              Startup Finance
+            </Title>
+            <Text type="secondary" style={{ fontSize: 14, color: "#666" }}>
+              Manage your funds, upgrades and withdrawals
+            </Text>
+          </Col>
+        </Row>
+      </div>
+
+      <Card
+        style={{
+          background: "white",
+          padding: 20,
+          borderRadius: 12,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          marginBottom: 24,
+          border: "1px solid #f0f0f0",
+        }}
+      >
+        <Title level={5} style={{ marginBottom: 12, color: "#1a1a1a" }}>
+          Wallet Overview
+        </Title>
+
+        <Row gutter={[24, 24]}>
+          {/* 1. Current Balance */}
+          <Col xs={12} sm={6}>
+            <Card
+              bordered={false}
+              style={{ background: "#f9fafb", borderRadius: 12 }}
+              bodyStyle={{ padding: "16px" }}
+            >
+              <div style={{ textAlign: "center" }}>
+                <Text type="secondary">Current Balance</Text>
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#059669",
+                    marginTop: 8,
+                  }}
+                >
+                  {formatCurrency(wallet?.balance ?? 0)}
+                </div>
+              </div>
+            </Card>
+          </Col>
+
+          {/* 2. Total Deposited */}
+          <Col xs={12} sm={6}>
+            <Card
+              bordered={false}
+              style={{ background: "#f9fafb", borderRadius: 12 }}
+              bodyStyle={{ padding: "16px" }}
+            >
+              <div style={{ textAlign: "center" }}>
+                <Text type="secondary">Total Deposited</Text>
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#2563eb",
+                    marginTop: 8,
+                  }}
+                >
+                  {formatCurrency(totals.totalDeposits)}
+                </div>
+              </div>
+            </Card>
+          </Col>
+
+          {/* 3. Total Received (Funding) */}
+          <Col xs={12} sm={6}>
+            <Card
+              bordered={false}
+              style={{ background: "#f9fafb", borderRadius: 12 }}
+              bodyStyle={{ padding: "16px" }}
+            >
+              <div style={{ textAlign: "center" }}>
+                <Text type="secondary">Total Received Funding</Text>
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#d97706", // Orange/Gold for funding
+                    marginTop: 8,
+                  }}
+                >
+                  {formatCurrency(totals.totalReceived)}
+                </div>
+              </div>
+            </Card>
+          </Col>
+
+          {/* 4. Available to Withdraw */}
+          <Col xs={12} sm={6}>
+            <Card
+              bordered={false}
+              style={{ background: "#f9fafb", borderRadius: 12 }}
+              bodyStyle={{ padding: "16px" }}
+            >
+              <div style={{ textAlign: "center" }}>
+                <Text type="secondary">Available to Withdraw</Text>
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#059669",
+                    marginTop: 8,
+                  }}
+                >
+                  {formatCurrency(availableForWithdrawal)}
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+
+        <Space size={[12, 12]} wrap style={{ marginTop: 24 }}>
+          <Button
+            type="primary"
+            size="large"
+            icon={<ArrowUpOutlined />}
+            style={{
+              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              border: "none",
+              borderRadius: 8,
+              height: 40,
+              fontWeight: 600,
+            }}
+            onClick={() => setDepositModalOpen(true)}
+          >
+            Deposit Funds
+          </Button>
+          <Button
+            size="large"
+            icon={<ArrowDownOutlined />}
+            style={{
+              borderRadius: 8,
+              height: 40,
+              fontWeight: 600,
+            }}
+            onClick={() => setWithdrawModalOpen(true)}
+          >
+            Withdraw Funds
+          </Button>
+          <Button
+            size="large"
+            onClick={() => fetchData(1, transactionPageSize)}
+            loading={status === "loading"}
+          >
+            Refresh
+          </Button>
+        </Space>
+      </Card>
+    </div>
+  );
+
+  const renderTransactionsSection = () => (
+    <Card
+      style={{
+        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+        border: "none",
+        borderRadius: 12,
+      }}
+    >
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 24,
+          marginBottom: 16,
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
-          <h2
-            style={{
-              fontSize: 24,
-              fontWeight: 600,
-              color: "#0f172a",
-              margin: 0,
-            }}
-          >
-            Transaction History
-          </h2>
-        </div>
-        <div style={{ display: "flex", gap: 12 }}>
-          <button
-            onClick={() => setDepositModalOpen(true)}
-            style={{
-              fontSize: 14,
-              padding: "8px 16px",
-              background: "#10b981",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: 500,
-            }}
-          >
-            + Deposit Money
-          </button>
-          <button
-            onClick={() => setWithdrawModalOpen(true)}
-            style={{
-              fontSize: 14,
-              padding: "8px 16px",
-              background: "#3b82f6",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: 500,
-            }}
-          >
-            Request Withdrawal
-          </button>
-        </div>
+        <Title level={4} style={{ margin: 0 }}>
+          Transaction History
+        </Title>
       </div>
+      {status === "loading" && (!transactions || transactions.length === 0) ? (
+        <InlineLoading />
+      ) : (
+        <Table<TransactionResponse>
+          rowKey={(record) => record.id}
+          columns={columns}
+          dataSource={transactions}
+          locale={{
+            emptyText: (
+              <Empty
+                description="No transactions yet"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            ),
+          }}
+          pagination={{
+            current: transactionPage,
+            pageSize: transactionPageSize,
+            total: transactionsPage?.totalElements ?? transactions.length,
+            showSizeChanger: true,
+          }}
+          onChange={handleTableChange}
+        />
+      )}
+    </Card>
+  );
 
-      {/* --- Stats Cards --- */}
-      <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 24 }}
+  const renderPendingRequests = () => {
+    // Filter pending items
+    const pendingDeposits = transactions.filter(
+      (t) => t.type === "DEPOSIT" && t.status === "PENDING"
+    );
+    const pendingWithdrawals = transactions.filter(
+      (t) => t.type === "WITHDRAW" && t.status === "PENDING"
+    );
+
+    return (
+      <Card
+        style={{
+          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          border: "none",
+          borderRadius: 12,
+        }}
       >
-        <div
-          style={{
-            flex: 1,
-            minWidth: 200,
-            background: "#fff",
-            borderRadius: 12,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-            padding: 16,
-          }}
-        >
-          <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 4px" }}>
-            Available Balance
-          </p>
-          <h2
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: "#0f172a",
-              margin: "0 0 4px",
-            }}
-          >
-            {formatCurrency(wallet?.balance ?? 0)}
-          </h2>
-          <p style={{ fontSize: 12, color: "#10b981", margin: 0 }}>
-            Ready to use
-          </p>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            minWidth: 200,
-            background: "#fff",
-            borderRadius: 12,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-            padding: 16,
-          }}
-        >
-          <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 4px" }}>
-            Total Deposited
-          </p>
-          <h2
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: "#3b82f6",
-              margin: "0 0 4px",
-            }}
-          >
-            {formatCurrency(totals.totalDeposits ?? 0)}
-          </h2>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            minWidth: 200,
-            background: "#fff",
-            borderRadius: 12,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-            padding: 16,
-          }}
-        >
-          <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 4px" }}>
-            Total Invested
-          </p>
-          <h2
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: "#8b5cf6",
-              margin: "0 0 4px",
-            }}
-          >
-            {formatCurrency(totals.totalInvested ?? 0)}
-          </h2>
-        </div>
-      </div>
+        <Title level={4} style={{ marginBottom: 24 }}>
+          Pending Requests
+        </Title>
 
-      {/* --- Transaction List --- */}
+        {pendingDeposits.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: 16,
+              background: "#f9fafb",
+              borderRadius: 8,
+              marginBottom: 12,
+              border: "1px solid #e5e7eb",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <Text strong>Deposit</Text>
+                <div>
+                  <Tag color="gold" style={{ margin: 0, fontSize: 10 }}>
+                    PENDING
+                  </Tag>
+                </div>
+              </div>
+              <Text strong style={{ color: "#2563eb" }}>
+                +{formatCurrency(Number(item.amount))}
+              </Text>
+            </div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+              {formatDateTime(item.createdAt)}
+            </div>
+          </div>
+        ))}
+
+        {pendingWithdrawals.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: 16,
+              background: "#f9fafb",
+              borderRadius: 8,
+              marginBottom: 12,
+              border: "1px solid #e5e7eb",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <Text strong>Withdraw</Text>
+                <div>
+                  <Tag color="orange" style={{ margin: 0, fontSize: 10 }}>
+                    PENDING
+                  </Tag>
+                </div>
+              </div>
+              <Text strong style={{ color: "#dc2626" }}>
+                {formatCurrency(Number(item.amount))}
+              </Text>
+            </div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+              {formatDateTime(item.createdAt)}
+            </div>
+          </div>
+        ))}
+
+        {!pendingDeposits.length && !pendingWithdrawals.length && (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="No pending requests"
+          />
+        )}
+      </Card>
+    );
+  };
+
+  if (initializing) {
+    return (
       <div
         style={{
-          background: "#fff",
-          borderRadius: 12,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-          padding: 16,
+          minHeight: "60vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
         }}
       >
-        <h3
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#0f172a",
-            margin: "0 0 8px",
-          }}
-        >
-          Recent Transactions
-        </h3>
-        <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 16px" }}>
-          Your deposit and withdrawal history
-        </p>
-
-        {status === "loading" && transactions.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 20 }}>
-            <InlineLoading />
-          </div>
-        ) : transactions.length === 0 ? (
-          <Empty description="No transactions found" />
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {transactions.map((item) => (
-              <div
-                key={item.id}
-                style={{ background: "#f9fafb", borderRadius: 8, padding: 12 }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {item.type.replace("_", " ").toLowerCase()}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        background: getStatusBg(item.status),
-                        color: getStatusColor(item.status),
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {item.status}
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: getAmountColor(item.type, item.amount),
-                    }}
-                  >
-                    {getAmountPrefix(item.type, item.amount)}
-                    {formatCurrency(Math.abs(Number(item.amount)))}
-                  </span>
-                </div>
-                <p
-                  style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}
-                >
-                  Date: {formatDateTime(item.createdAt)} • ID: #{item.id}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+        <InlineLoading message="Loading financial data..." />
       </div>
+    );
+  }
 
-      {/* --- Deposit Modal --- */}
+  return (
+    <div
+      style={{
+        padding: 24,
+        background: "#f0f2f5",
+        minHeight: "100vh",
+      }}
+    >
+      <Row gutter={[24, 24]}>
+        {/* Top Summary */}
+        <Col span={24}>{renderWalletSummary()}</Col>
+
+        {/* Left: Transaction History */}
+        <Col xs={24} lg={16}>
+          {renderTransactionsSection()}
+        </Col>
+
+        {/* Right: Pending Requests */}
+        <Col xs={24} lg={8}>
+          {renderPendingRequests()}
+        </Col>
+      </Row>
+
+      {/* --- MODALS --- */}
       <Modal
         title="Deposit Money"
         open={depositModalOpen}
-        onCancel={() => setDepositModalOpen(false)}
+        onCancel={() => {
+          setDepositModalOpen(false);
+          depositForm.resetFields();
+        }}
         onOk={handleDepositSubmit}
-        confirmLoading={status === "loading"} // Dùng status từ slice
-        okText="Confirm Deposit"
+        confirmLoading={status === "loading"}
+        okText="Pay with PayOS"
+        cancelText="Cancel"
       >
         <Form form={depositForm} layout="vertical">
           <Form.Item
@@ -456,71 +666,81 @@ const Payment: React.FC = () => {
             <InputNumber<number>
               style={{ width: "100%" }}
               min={10000}
-              formatter={(value) =>
-                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-              }
-              // --- SỬA PARSER ---
-              parser={(value) => value?.replace(/\$\s?|(,*)/g, "") as any}
+              step={10000}
+              formatter={formatNumberInput}
+              parser={parseNumberInput}
             />
           </Form.Item>
+          <Text type="secondary">
+            You will be redirected to PayOS payment gateway.
+          </Text>
         </Form>
       </Modal>
 
-      {/* --- Withdraw Modal --- */}
       <Modal
         title="Withdraw Money"
         open={withdrawModalOpen}
-        onCancel={() => setWithdrawModalOpen(false)}
+        onCancel={() => {
+          setWithdrawModalOpen(false);
+          withdrawForm.resetFields();
+        }}
         onOk={handleWithdrawSubmit}
-        confirmLoading={status === "loading"} // Dùng status từ slice
-        okText="Confirm Withdrawal"
+        confirmLoading={status === "loading"}
+        okText="Submit Request"
+        cancelText="Cancel"
       >
         <Form form={withdrawForm} layout="vertical">
           <div
             style={{
-              marginBottom: 16,
               padding: 12,
-              background: "#f0f2f5",
+              background: "#f0f9ff",
               borderRadius: 6,
+              marginBottom: 16,
+              border: "1px solid #bae6fd",
             }}
           >
-            <span style={{ fontSize: 12, color: "#666" }}>Available: </span>
-            <strong style={{ color: "#3b82f6" }}>
-              {formatCurrency(wallet?.balance)}
-            </strong>
+            <Text type="secondary">Available Balance: </Text>
+            <Text strong style={{ color: "#0284c7" }}>
+              {formatCurrency(wallet?.balance ?? 0)}
+            </Text>
           </div>
+
           <Form.Item
             label="Amount (VND)"
             name="amount"
             rules={[
-              { required: true },
+              { required: true, message: "Please enter amount" },
               {
                 type: "number",
-                max: Number(wallet?.balance ?? 0),
-                message: "Insufficient balance",
-              },
-              {
-                type: "number",
-                min: 50000, // Đặt giới hạn rút tối thiểu
+                min: 50000,
                 message: "Minimum withdrawal is 50,000 VND",
               },
+              () => ({
+                validator(_, value) {
+                  const bal = Number(wallet?.balance ?? 0);
+                  const v = Number(value ?? 0);
+                  if (!value) return Promise.resolve();
+                  if (v > bal) {
+                    return Promise.reject(new Error("Insufficient balance"));
+                  }
+                  return Promise.resolve();
+                },
+              }),
             ]}
           >
             <InputNumber<number>
               style={{ width: "100%" }}
               min={50000}
-              max={Number(wallet?.balance ?? 0)}
-              formatter={(value) =>
-                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-              }
-              // --- SỬA PARSER ---
-              parser={(value) => value?.replace(/\$\s?|(,*)/g, "") as any}
+              step={50000}
+              formatter={formatNumberInput}
+              parser={parseNumberInput}
             />
           </Form.Item>
+
           <Form.Item
             label="Bank Name"
             name="bankName"
-            rules={[{ required: true }]}
+            rules={[{ required: true, message: "Please select bank" }]}
           >
             <Select placeholder="Select bank">
               <Select.Option value="Vietcombank">Vietcombank</Select.Option>
@@ -530,20 +750,27 @@ const Payment: React.FC = () => {
               <Select.Option value="VPBank">VPBank</Select.Option>
               <Select.Option value="BIDV">BIDV</Select.Option>
               <Select.Option value="VietinBank">VietinBank</Select.Option>
-              <Select.Option value="Other">Other</Select.Option>
+              <Select.Option value="TPBank">TPBank</Select.Option>
             </Select>
           </Form.Item>
+
           <Form.Item
             label="Account Number"
             name="bankAccountNumber"
-            rules={[{ required: true }]}
+            rules={[
+              { required: true, message: "Please enter account number" },
+              { pattern: /^[0-9]+$/, message: "Invalid account number" },
+            ]}
           >
-            <Input />
+            <Input placeholder="e.g. 1903..." />
           </Form.Item>
+
           <Form.Item
             label="Account Holder Name"
             name="accountHolderName"
-            rules={[{ required: true }]}
+            rules={[
+              { required: true, message: "Please enter account holder name" },
+            ]}
           >
             <Input placeholder="UPPERCASE NAME (e.g., NGUYEN VAN A)" />
           </Form.Item>

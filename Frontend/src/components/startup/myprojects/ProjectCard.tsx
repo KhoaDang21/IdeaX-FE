@@ -1,9 +1,9 @@
 import type { FC } from "react";
-import { Popconfirm, Tooltip, Progress } from "antd"; // Đã thêm Progress
-import { DeleteOutlined } from "@ant-design/icons";
+import { Popconfirm, Tooltip, Progress } from "antd";
+import { DeleteOutlined, DollarCircleOutlined } from "@ant-design/icons";
 import type { ProjectUI } from "../../../interfaces/startup/myprojects";
 
-// Helpers được di chuyển vào đây vì chúng chỉ thuộc về component này
+// Helpers
 const getStatusColor = (status: string) => {
   switch (status.toUpperCase()) {
     case "APPROVED":
@@ -39,7 +39,7 @@ const getStatusText = (status: string): string => {
 };
 
 interface Props {
-  project: ProjectUI;
+  project: ProjectUI & { fundingRangeDisplay?: string };
   isSelected: boolean;
   isDeleting: boolean;
   isDeletionDisallowed: boolean;
@@ -59,6 +59,11 @@ export const ProjectCard: FC<Props> = ({
 }) => {
   const statusStyle = getStatusColor(project.status);
 
+  // Kiểm tra đã ký hợp đồng chưa (APPROVED hoặc COMPLETE)
+  const isContractSigned = ["APPROVED", "COMPLETE"].includes(
+    project.status.toUpperCase()
+  );
+
   return (
     <div
       key={project.id}
@@ -74,6 +79,8 @@ export const ProjectCard: FC<Props> = ({
         cursor: isDeleting ? "not-allowed" : "pointer",
         opacity: isDeleting ? 0.6 : 1,
         transition: "all 0.2s ease",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {/* Header: Title & Status */}
@@ -82,17 +89,38 @@ export const ProjectCard: FC<Props> = ({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          marginBottom: 12,
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 16 }}>{project.title}</h3>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 16,
+            flex: 1,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+          title={project.title}
+        >
+          {project.title}
+        </h3>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginLeft: 8,
+          }}
+        >
           <span
             style={{
-              fontSize: 12,
+              fontSize: 11,
               background: statusStyle.background,
               color: statusStyle.color,
               padding: "2px 8px",
               borderRadius: 999,
+              whiteSpace: "nowrap",
             }}
           >
             {getStatusText(project.status)}
@@ -109,7 +137,7 @@ export const ProjectCard: FC<Props> = ({
             <Popconfirm
               title="Are you sure you want to delete this project?"
               onConfirm={(e) => {
-                e?.stopPropagation(); // Ngăn không cho card được chọn
+                e?.stopPropagation();
                 onDelete(project.id);
               }}
               onCancel={(e) => e?.stopPropagation()}
@@ -118,7 +146,7 @@ export const ProjectCard: FC<Props> = ({
               disabled={isDeleting}
             >
               <DeleteOutlined
-                onClick={(e) => e.stopPropagation()} // Ngăn không cho card được chọn
+                onClick={(e) => e.stopPropagation()}
                 style={{
                   color: isDeleting ? "#d1d5db" : "#ef4444",
                   cursor: isDeleting ? "not-allowed" : "pointer",
@@ -129,42 +157,93 @@ export const ProjectCard: FC<Props> = ({
         </div>
       </div>
 
-      {/* Target Info */}
-      <p style={{ margin: "12px 0 4px", fontSize: 12, color: "#64748b" }}>
-        Target:{" "}
-        <span style={{ color: "#1e293b", fontWeight: 500 }}>
-          {project.target}
-        </span>
-      </p>
-
-      {/* Raised Info & Progress Bar */}
-      <div style={{ marginBottom: 8 }}>
-        {/* 👇 SỬA DÒNG NÀY: Đổi space-between thành flex-start và thêm gap */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-start",
-            gap: "4px",
-            fontSize: 12,
-            marginBottom: 4,
-          }}
-        >
-          <span style={{ color: "#64748b" }}>Raised:</span>
-          <span style={{ fontWeight: 600, color: "#10b981" }}>
-            {project.raised}
-          </span>
-        </div>
-        <Progress
-          percent={project.progress}
-          showInfo={false}
-          size="small"
-          strokeColor="#3b82f6"
-          trailColor="#e5e7eb"
-        />
+      {/* --- PHẦN TÀI CHÍNH (Updated) --- */}
+      <div style={{ minHeight: 60, marginBottom: 8 }}>
+        {isContractSigned ? (
+          // 1. Đã ký hợp đồng: Hiện Target, Raised, Progress kèm %
+          <>
+            <p style={{ margin: "0 0 8px", fontSize: 12, color: "#64748b" }}>
+              Target:{" "}
+              <span style={{ color: "#1e293b", fontWeight: 500 }}>
+                {project.target}
+              </span>
+            </p>
+            <div style={{ marginBottom: 4 }}>
+              {/* Flex space-between để Raised và % nằm 2 đầu */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: 12,
+                  marginBottom: 4,
+                }}
+              >
+                <div style={{ display: "flex", gap: "4px" }}>
+                  <span style={{ color: "#64748b" }}>Raised:</span>
+                  <span style={{ fontWeight: 600, color: "#10b981" }}>
+                    {project.raised}
+                  </span>
+                </div>
+                {/* Hiển thị số % */}
+                <span
+                  style={{ fontWeight: 600, color: "#3b82f6", fontSize: 11 }}
+                >
+                  {project.progress}%
+                </span>
+              </div>
+              <Progress
+                percent={project.progress}
+                showInfo={false}
+                size="small"
+                strokeColor="#3b82f6"
+                trailColor="#e5e7eb"
+              />
+            </div>
+          </>
+        ) : (
+          // 2. Chưa ký hợp đồng: Hiện Funding Range
+          <div
+            style={{
+              background: "#f8fafc",
+              padding: "10px",
+              borderRadius: "8px",
+              border: "1px dashed #cbd5e1",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 11,
+                color: "#64748b",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              Estimated Range
+            </p>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 4,
+              }}
+            >
+              <DollarCircleOutlined style={{ color: "#64748b" }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#334155" }}>
+                {project.fundingRangeDisplay || "Not specified"}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stage Info */}
-      <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
+      <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b", flex: 1 }}>
         Stage: {project.stage}
       </p>
 
