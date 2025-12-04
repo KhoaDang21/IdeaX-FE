@@ -1,5 +1,5 @@
-export const BASE_URL = "https://ideax-backend.onrender.com";
-// export const BASE_URL = "https://ideax-backend.onrender.com";
+// Sử dụng environment variable, fallback về localhost nếu không có
+export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 // Auth endpoints
 export const LOGIN_ENDPOINT = `${BASE_URL}/auth/login`;
