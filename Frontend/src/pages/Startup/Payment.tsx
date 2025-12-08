@@ -30,7 +30,6 @@ import {
   getTransactionHistory,
 } from "../../services/features/payment/paymentSlice";
 
-// ✅ 1. IMPORT INTERFACE CHÍNH THỨC (Thay vì tự định nghĩa lại gây lỗi)
 import type { TransactionResponse } from "../../interfaces/payment";
 
 const { Title, Text } = Typography;
@@ -44,6 +43,7 @@ const statusColor: Record<string, string> = {
   REFUNDED: "volcano",
   FAILED: "red",
   REJECTED: "red",
+  CANCELLED: "red",
 };
 
 const formatNumberInput = (value?: string | number) => {
@@ -178,29 +178,22 @@ const Payment: React.FC = () => {
   // --- Calculations ---
   const totals = useMemo(() => {
     let totalDeposits = 0;
-    let totalReceived = 0; // Thay cho Total Invested
+    let totalReceived = 0;
     let pendingWithdrawals = 0;
 
     if (!transactions || transactions.length === 0)
       return { totalDeposits, totalReceived, pendingWithdrawals };
 
     for (const t of transactions) {
-      // ✅ 2. ÉP KIỂU SANG NUMBER VÌ INTERFACE LÀ STRING
       const amt = Number(t.amount ?? 0);
       const abs = Math.abs(amt);
 
-      // Tính tổng tiền nạp
       if (t.type === "DEPOSIT" && t.status === "SUCCESS") {
         totalDeposits += abs;
       }
-
-      // Tính tổng tiền NHẬN ĐƯỢC từ Investor (giải ngân)
-      // PAYMENT_RELEASE là tiền cộng vào ví startup
       if (t.type === "PAYMENT_RELEASE" && t.status === "SUCCESS") {
         totalReceived += abs;
       }
-
-      // Tính tiền đang chờ rút
       if (t.type === "WITHDRAW" && t.status === "PENDING") {
         pendingWithdrawals += abs;
       }
@@ -228,12 +221,11 @@ const Payment: React.FC = () => {
         const typeColors: Record<string, string> = {
           DEPOSIT: "blue",
           WITHDRAW: "orange",
-          PROJECT_PAYMENT: "purple", // Tiền từ investor
-          PAYMENT_RELEASE: "green", // Tiền nhận được (quan trọng với startup)
+          PROJECT_PAYMENT: "purple",
+          PAYMENT_RELEASE: "green",
           PAYMENT_REFUND: "volcano",
           PROJECT_UPGRADE: "cyan",
         };
-        // Hiển thị tên thân thiện hơn
         let label = value;
         if (value === "PAYMENT_RELEASE") label = "RECEIVED FUND";
         if (value === "PROJECT_UPGRADE") label = "PACKAGE UPGRADE";
@@ -241,16 +233,36 @@ const Payment: React.FC = () => {
         return <Tag color={typeColors[value] || "default"}>{label}</Tag>;
       },
     },
+    // --- CỘT AMOUNT ĐÃ SỬA LOGIC USER ---
     {
       title: "Amount",
       dataIndex: "amount",
       key: "amount",
-      // ✅ 3. SỬA RENDER ĐỂ NHẬN CẢ STRING HOẶC NUMBER
-      render: (value: number | string) => {
-        const num = Number(value);
-        // Tô màu: Dương (Xanh), Âm (Đỏ)
+      render: (value: number | string, record) => {
+        let num = Number(value);
+
+        // USER LOGIC:
+        // Các loại giao dịch này là CHI PHÍ (Trừ tiền) => ÂM
+        if (
+          record.type === "PROJECT_UPGRADE" ||
+          record.type === "NDA_FEE" ||
+          record.type === "WITHDRAW" ||
+          record.type === "PROJECT_PAYMENT" // Investor chuyển tiền đi
+        ) {
+          num = -Math.abs(num);
+        }
+        // Các loại giao dịch này là THU NHẬP (Cộng tiền) => DƯƠNG
+        else if (
+          record.type === "DEPOSIT" ||
+          record.type === "PAYMENT_RELEASE" || // Startup nhận tiền
+          record.type === "PAYMENT_REFUND"
+        ) {
+          num = Math.abs(num);
+        }
+
         const color = num >= 0 ? "#3f8600" : "#cf1322";
         const prefix = num > 0 ? "+" : "";
+
         return (
           <span style={{ color, fontWeight: 600 }}>
             {prefix}
@@ -286,7 +298,7 @@ const Payment: React.FC = () => {
               level={3}
               style={{
                 margin: 0,
-                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", // Green theme for Startup logic
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 fontWeight: 700,
@@ -316,7 +328,6 @@ const Payment: React.FC = () => {
         </Title>
 
         <Row gutter={[24, 24]}>
-          {/* 1. Current Balance */}
           <Col xs={12} sm={6}>
             <Card
               bordered={false}
@@ -339,7 +350,6 @@ const Payment: React.FC = () => {
             </Card>
           </Col>
 
-          {/* 2. Total Deposited */}
           <Col xs={12} sm={6}>
             <Card
               bordered={false}
@@ -362,7 +372,6 @@ const Payment: React.FC = () => {
             </Card>
           </Col>
 
-          {/* 3. Total Received (Funding) */}
           <Col xs={12} sm={6}>
             <Card
               bordered={false}
@@ -375,7 +384,7 @@ const Payment: React.FC = () => {
                   style={{
                     fontSize: 20,
                     fontWeight: 700,
-                    color: "#d97706", // Orange/Gold for funding
+                    color: "#d97706",
                     marginTop: 8,
                   }}
                 >
@@ -385,7 +394,6 @@ const Payment: React.FC = () => {
             </Card>
           </Col>
 
-          {/* 4. Available to Withdraw */}
           <Col xs={12} sm={6}>
             <Card
               bordered={false}
@@ -623,15 +631,10 @@ const Payment: React.FC = () => {
       }}
     >
       <Row gutter={[24, 24]}>
-        {/* Top Summary */}
         <Col span={24}>{renderWalletSummary()}</Col>
-
-        {/* Left: Transaction History */}
         <Col xs={24} lg={16}>
           {renderTransactionsSection()}
         </Col>
-
-        {/* Right: Pending Requests */}
         <Col xs={24} lg={8}>
           {renderPendingRequests()}
         </Col>

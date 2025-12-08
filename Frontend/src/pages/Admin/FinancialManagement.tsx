@@ -48,7 +48,7 @@ interface Transaction {
   accountId: number;
   accountEmail: string;
   accountName: string;
-  accountRole: string; // [NEW] Thêm trường Role
+  accountRole: string;
 }
 
 const FinancialManagement: React.FC = () => {
@@ -68,7 +68,6 @@ const FinancialManagement: React.FC = () => {
     fetchTransactions(1);
   }, []);
 
-  // Gọi lại API khi filter loại giao dịch thay đổi
   useEffect(() => {
     fetchTransactions(1);
   }, [filterType]);
@@ -111,7 +110,6 @@ const FinancialManagement: React.FC = () => {
 
   const onSearch = (value: string) => {
     setSearchText(value);
-    // Gọi trực tiếp với page 1 để đảm bảo logic search được áp dụng ngay
     setLoading(true);
     const params: any = {
       page: 0,
@@ -142,7 +140,6 @@ const FinancialManagement: React.FC = () => {
     }).format(val);
 
   const columns: ColumnsType<Transaction> = [
-    // 1. Cột Số thứ tự (STT)
     {
       title: "STT",
       key: "stt",
@@ -152,7 +149,6 @@ const FinancialManagement: React.FC = () => {
         return (pagination.current - 1) * pagination.pageSize + index + 1;
       },
     },
-    // 2. Cột User Info (Email ưu tiên)
     {
       title: "User Info",
       key: "user",
@@ -173,15 +169,13 @@ const FinancialManagement: React.FC = () => {
         </div>
       ),
     },
-    // 3. [NEW] Cột Role
     {
       title: "Role",
       dataIndex: "accountRole",
       key: "accountRole",
-      width: 200,
+      width: 160,
       render: (role) => {
         let color = "default";
-        // Màu sắc phân biệt các vai trò
         if (role === "INVESTOR") color = "geekblue";
         if (role === "START_UP") color = "green";
         if (role === "ADMIN") color = "red";
@@ -193,7 +187,6 @@ const FinancialManagement: React.FC = () => {
         );
       },
     },
-    // 4. Cột Type Transaction
     {
       title: "Type",
       dataIndex: "type",
@@ -243,13 +236,31 @@ const FinancialManagement: React.FC = () => {
         );
       },
     },
-    // 5. Cột Amount
+    // --- CỘT AMOUNT ĐÃ SỬA LOGIC ADMIN ---
     {
       title: "Amount",
       dataIndex: "amount",
       key: "amount",
-      render: (val) => {
-        const isNegative = val < 0;
+      render: (val, record) => {
+        let num = Number(val);
+
+        // ADMIN LOGIC:
+        // Các loại này là tiền VÀO hệ thống (Doanh thu hoặc User nạp) => DƯƠNG
+        if (
+          record.type === "PROJECT_UPGRADE" ||
+          record.type === "NDA_FEE" ||
+          record.type === "DEPOSIT" ||
+          record.type === "PAYMENT_RELEASE" || // Startup nhận tiền (Dương trong hệ thống)
+          record.type === "PROJECT_PAYMENT" // Investor chuyển tiền (Dương trong hệ thống)
+        ) {
+          num = Math.abs(num);
+        }
+        // Các loại này là tiền RA khỏi hệ thống => ÂM
+        else if (record.type === "WITHDRAW") {
+          num = -Math.abs(num);
+        }
+
+        const isNegative = num < 0;
         return (
           <span
             style={{
@@ -259,13 +270,12 @@ const FinancialManagement: React.FC = () => {
               fontSize: 15,
             }}
           >
-            {val > 0 ? "+" : ""}
-            {formatCurrency(val)}
+            {num > 0 ? "+" : ""}
+            {formatCurrency(num)}
           </span>
         );
       },
     },
-    // 6. Cột Status
     {
       title: "Status",
       dataIndex: "status",
@@ -284,7 +294,6 @@ const FinancialManagement: React.FC = () => {
         </Tag>
       ),
     },
-    // 7. Cột Date
     {
       title: "Date",
       dataIndex: "createdAt",
@@ -299,7 +308,6 @@ const FinancialManagement: React.FC = () => {
         Financial Overview
       </Title>
 
-      {/* --- STATS CARDS --- */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card
@@ -319,7 +327,6 @@ const FinancialManagement: React.FC = () => {
             </div>
           </Card>
         </Col>
-
         <Col xs={24} sm={12} lg={6}>
           <Card
             bordered={false}
@@ -335,7 +342,6 @@ const FinancialManagement: React.FC = () => {
             />
           </Card>
         </Col>
-
         <Col xs={24} sm={12} lg={6}>
           <Card
             bordered={false}
@@ -351,7 +357,6 @@ const FinancialManagement: React.FC = () => {
             />
           </Card>
         </Col>
-
         <Col xs={24} sm={12} lg={6}>
           <Card
             bordered={false}
@@ -367,7 +372,6 @@ const FinancialManagement: React.FC = () => {
             />
           </Card>
         </Col>
-
         <Col span={24}>
           <Card
             style={{
@@ -403,7 +407,6 @@ const FinancialManagement: React.FC = () => {
         </Col>
       </Row>
 
-      {/* --- TRANSACTIONS TABLE --- */}
       <Card
         title="System Transactions Log"
         bordered={false}
@@ -418,7 +421,6 @@ const FinancialManagement: React.FC = () => {
             flexWrap: "wrap",
           }}
         >
-          {/* Thanh Search */}
           <Search
             placeholder="Search by Email, Investor or Startup Name"
             allowClear
@@ -427,8 +429,6 @@ const FinancialManagement: React.FC = () => {
             style={{ width: 350 }}
             enterButton
           />
-
-          {/* Thanh Filter Type */}
           <Select
             placeholder="Filter by Transaction Type"
             style={{ width: 250 }}
@@ -442,7 +442,6 @@ const FinancialManagement: React.FC = () => {
             <Option value="PROJECT_PAYMENT">Investment (Đầu tư)</Option>
             <Option value="PAYMENT_RELEASE">Release (Giải ngân)</Option>
           </Select>
-
           <Button type="primary" onClick={() => fetchTransactions(1)}>
             Refresh Data
           </Button>
