@@ -17,7 +17,8 @@ import logo from "../assets/images/541447718_1863458311190035_821270648510958033
 const card: CSSProperties = {
   background: "#fff",
   borderRadius: 16,
-  boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
+  boxShadow:
+    "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
 };
 
 const NavItem: FC<{ to: string; icon: ReactNode; label: string }> = ({
@@ -26,7 +27,8 @@ const NavItem: FC<{ to: string; icon: ReactNode; label: string }> = ({
   label,
 }) => {
   const { pathname } = useLocation();
-  const active = pathname === to;
+  // Kiểm tra active chính xác hơn (bao gồm cả sub-routes nếu cần)
+  const active = pathname === to || pathname.startsWith(`${to}/`);
 
   return (
     <Link
@@ -35,16 +37,24 @@ const NavItem: FC<{ to: string; icon: ReactNode; label: string }> = ({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: 12,
         textDecoration: "none",
-        color: active ? "#fff" : "#0f172a",
+        color: active ? "#fff" : "#1e293b",
         background: active ? "#34419A" : "transparent",
-        padding: "10px 14px",
-        borderRadius: 10,
+        padding: "12px 16px",
+        borderRadius: 12,
         fontWeight: 500,
+        transition: "all 0.2s ease",
+        fontSize: "14px",
       }}
     >
-      <span style={{ width: 20, display: "flex", justifyContent: "center" }}>
+      <span
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         {icon}
       </span>
       <span>{label}</span>
@@ -73,28 +83,28 @@ const AdminSidebar: FC = () => {
   const menuItems = [
     {
       to: "/admin/user-management",
-      icon: <Users size={18} />,
+      icon: <Users size={20} />,
       label: "User Management",
     },
     {
       to: "/admin/project-management",
-      icon: <FolderCog size={18} />,
+      icon: <FolderCog size={20} />,
       label: "Project Management",
     },
     {
       to: "/admin/withdrawals",
-      icon: <CreditCard size={18} />,
+      icon: <CreditCard size={20} />,
       label: "Withdrawal Requests",
     },
     {
       to: "/admin/financial-management",
-      icon: <Wallet size={18} />,
+      icon: <Wallet size={20} />,
       label: "Financial Management",
     },
     {
       to: "/admin/room-and-contract",
-      icon: <FileText size={18} />,
-      label: "Room & Contract",
+      icon: <FileText size={20} />,
+      label: "Rooms Management",
     },
   ];
 
@@ -111,112 +121,130 @@ const AdminSidebar: FC = () => {
   };
 
   return (
-    <aside
+    <div
       style={{
-        width: 260,
-        padding: 16,
-        background: "#DBEAFE",
-        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100%", // Quan trọng: Chiếm full chiều cao của thẻ aside cha
+        padding: "20px 16px",
       }}
     >
-      <div
-        style={{ display: "flex", flexDirection: "column", minHeight: "100%" }}
-      >
-        {/* MAIN CONTENT (được đẩy lên trên) */}
-        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ margin: "0 0 20px 4px" }}>
-            <img
-              src={logo}
-              alt="Idea"
-              style={{ width: 42, height: 42, borderRadius: 8 }}
-            />
-          </div>
+      {/* Top Section */}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {/* Logo */}
+        <div style={{ marginBottom: 24, paddingLeft: 4 }}>
+          <img
+            src={logo}
+            alt="Idea Logo"
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              objectFit: "cover",
+            }}
+          />
+        </div>
 
-          <div style={{ ...card, padding: 16, marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {user?.profilePictureUrl ? (
-                <img
-                  src={user.profilePictureUrl}
-                  alt="avatar"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    objectFit: "cover",
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    background: "#34419A",
-                    color: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 800,
-                  }}
-                >
-                  {getInitials(user?.fullName, user?.email)}
-                </div>
-              )}
-              <div>
-                <div style={{ color: "#0f172a", fontWeight: 700 }}>
-                  {user?.fullName || user?.email || "Admin"}
-                </div>
-                <div style={{ color: "#6b7280", fontSize: 13 }}>
-                  Admin Portal
-                </div>
+        {/* User Profile Card */}
+        <div style={{ ...card, padding: 16, marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {user?.profilePictureUrl ? (
+              <img
+                src={user.profilePictureUrl}
+                alt="avatar"
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  background: "#34419A",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  fontSize: 14,
+                }}
+              >
+                {getInitials(user?.fullName, user?.email)}
               </div>
+            )}
+            <div style={{ overflow: "hidden" }}>
+              <div
+                style={{
+                  color: "#0f172a",
+                  fontWeight: 600,
+                  fontSize: 14,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {user?.fullName || "Admin User"}
+              </div>
+              <div style={{ color: "#64748b", fontSize: 12 }}>Admin Portal</div>
             </div>
           </div>
-
-          <div
-            style={{
-              marginBottom: 14,
-              color: "#6b7280",
-              fontWeight: 700,
-              fontSize: 12,
-              letterSpacing: 1,
-            }}
-          >
-            ADMIN PORTAL
-          </div>
-
-          <nav style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {menuItems.map((item) => (
-              <NavItem key={item.to} {...item} />
-            ))}
-          </nav>
         </div>
 
-        {/* LOGOUT BUTTON (ở dưới cùng) */}
-        <div style={{ marginTop: "auto" }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              width: "100%",
-              marginTop: 16,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #ef4444",
-              background: "#fff",
-              color: "#ef4444",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-            title="Logout"
-          >
-            <LogOut size={18} /> Logout
-          </button>
+        {/* Menu Label */}
+        <div
+          style={{
+            marginBottom: 12,
+            paddingLeft: 12,
+            color: "#64748b",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}
+        >
+          Menu
         </div>
+
+        {/* Navigation */}
+        <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {menuItems.map((item) => (
+            <NavItem key={item.to} {...item} />
+          ))}
+        </nav>
       </div>
-    </aside>
+
+      {/* Logout Button (Bottom) */}
+      <div style={{ marginTop: "auto", paddingTop: 20 }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            width: "100%",
+            padding: "12px",
+            borderRadius: 12,
+            border: "1px solid #fee2e2",
+            background: "#fff",
+            color: "#ef4444",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            fontWeight: 600,
+            fontSize: 14,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#fef2f2")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+        >
+          <LogOut size={18} /> Logout
+        </button>
+      </div>
+    </div>
   );
 };
 

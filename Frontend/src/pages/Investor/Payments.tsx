@@ -389,7 +389,38 @@ const Payments: React.FC = () => {
       title: "Amount",
       dataIndex: "amount",
       key: "amount",
-      render: (value: string) => formatCurrency(value),
+      render: (value: number | string, record) => {
+        let num = Number(value);
+
+        // Với User (Startup/Investor):
+        // Các khoản này là Chi phí (Tiền ra) => hiển thị ÂM (-), màu ĐỎ
+        if (
+          record.type === "PROJECT_UPGRADE" ||
+          record.type === "NDA_FEE" ||
+          record.type === "WITHDRAW" ||
+          record.type === "PROJECT_PAYMENT" // Investor chuyển tiền đi
+        ) {
+          num = -Math.abs(num);
+        }
+        // Các khoản này là Thu nhập (Tiền vào) => hiển thị DƯƠNG (+), màu XANH
+        else if (
+          record.type === "DEPOSIT" ||
+          record.type === "PAYMENT_RELEASE" || // Startup nhận tiền
+          record.type === "PAYMENT_REFUND"
+        ) {
+          num = Math.abs(num);
+        }
+
+        const color = num >= 0 ? "#3f8600" : "#cf1322";
+        const prefix = num > 0 ? "+" : "";
+
+        return (
+          <span style={{ color, fontWeight: 600 }}>
+            {prefix}
+            {formatCurrency(num)}
+          </span>
+        );
+      },
     },
     {
       title: "Status",
