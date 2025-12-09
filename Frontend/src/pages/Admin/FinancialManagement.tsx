@@ -298,7 +298,12 @@ const FinancialManagement: React.FC = () => {
       title: "Date",
       dataIndex: "createdAt",
       key: "createdAt",
-      render: (val) => dayjs(val).format("DD/MM/YYYY HH:mm"),
+      render: (val) => {
+        if (!val) return "-";
+        // Nếu chuỗi chưa có chữ Z ở cuối, tự động thêm vào để báo hiệu đây là giờ UTC
+        const utcValue = val.endsWith("Z") ? val : val + "Z";
+        return dayjs(utcValue).format("DD/MM/YYYY HH:mm");
+      },
     },
   ];
 
@@ -390,18 +395,7 @@ const FinancialManagement: React.FC = () => {
                   {formatCurrency(Number(stats?.currentSystemBalance || 0))}
                 </div>
               </Col>
-              <Col>
-                <div
-                  style={{
-                    background: "rgba(255,255,255,0.2)",
-                    padding: "4px 12px",
-                    borderRadius: 4,
-                    fontSize: 12,
-                  }}
-                >
-                  Real-time
-                </div>
-              </Col>
+              <Col></Col>
             </Row>
           </Card>
         </Col>
